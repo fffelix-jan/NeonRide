@@ -3,7 +3,6 @@
 import pygame
 import sys
 import math
-import warnings
 
 # Constants
 NATIVE_WIDTH = 480
@@ -30,6 +29,18 @@ pygame.init()
 
 # Set initial window size
 screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE)
+pygame.display.set_caption("Neon Ride")
+
+# Convert Scratch colour integer to hex code
+def scratch_color_to_hex(color_int):
+    # Extract red, green, and blue components
+    r = (color_int // 65536) % 256
+    g = (color_int // 256) % 256
+    b = color_int % 256
+    
+    # Convert to hex string
+    hex_code = f'#{r:02x}{g:02x}{b:02x}'
+    return hex_code
 
 ## Pen class (used globally)
 class Pen:
@@ -38,7 +49,7 @@ class Pen:
         self.x = NATIVE_WIDTH // 2
         self.y = NATIVE_HEIGHT // 2
         self.direction = 0  # In degrees, 0 means right
-        self.pen_down = False
+        self.pen_down_status = False
         self.pen_size = 1
         self.pen_color = (0, 0, 0)  # Default black
         self.pen_shade = 100  # Representing 100% shade (normal)
@@ -93,6 +104,10 @@ class Pen:
     # Set pen color (hex code)
     def set_pen_color(self, hex_code):
         self.pen_color = pygame.Color(hex_code)
+    
+    # Set pen color (Scratch color integer)
+    def set_pen_color_scratch(self, color_int):
+        self.pen_color = pygame.Color(scratch_color_to_hex(int(color_int)))
 
     # Set pen shade
     def set_pen_shade(self, shade_percent):
@@ -102,11 +117,11 @@ class Pen:
 
     # Pen down
     def pen_down(self):
-        self.pen_down = True
+        self.pen_down_status = True
 
     # Pen up
     def pen_up(self):
-        self.pen_down = False
+        self.pen_down_status = False
 
     # Erase all
     def erase_all(self):
@@ -258,9 +273,11 @@ def draw_scaled_rounded_line(surface, color, start_pos, end_pos, thickness, scal
 
 ## Functions to draw text
 def draw_letter(letter):
+    if letter == '/':
+        return
     letter = letter.lower() # Scratch uses case-insensitive letter comparison
-    if not(letter == '/' or letter == '.' or letter == '!' or letter == '-'):
-        pen.down()
+    if not(letter == '.' or letter == '!' or letter == '-'):
+        pen.pen_down()
 
     # GitHub Copilot seems to know most of this letter-drawing code by itself
     # Maybe someone ported this to Python before me...
@@ -528,7 +545,7 @@ def draw_letter(letter):
         pen.pen_down()
         pen.change_x_by(10 * (size / 100))
     else:
-        warnings.warn(f"Letter '{letter}' is not supported for drawing.")
+        print(f"WARN: Letter '{letter}' is not supported for drawing.")
     # That's it for this super long function!
     # I'm surprised GitHub Copilot knew EXACTLY what I was gonna write next!
 
@@ -543,7 +560,7 @@ def load_message_at(message, x, y, font_size, color):
         elif color == "0.5":
             pen.set_pen_color('#9C9EA2')
         else:
-            pen.set_pen_color(color)
+            pen.set_pen_color_scratch(color)
             pen.set_pen_shade(50)
         
         pen.set_pen_size(3 * (size / 100))
@@ -631,13 +648,17 @@ def move():
 def start_animation():
     pen.erase_all()
     dark_field()
+    pygame.display.flip()  # Update the screen after drawing
     pygame.time.wait(500)
+    
     pen.set_pen_size(15)
     pen.goto(-240, -20)
     pen.pen_down()
     pen.set_pen_color('#4A6CD4')
     pen.goto(240, -20)
+    pygame.display.flip()  # Update the screen after drawing
     pen.pen_up()
+    
     pygame.time.wait(2000)
     start_animation = 1
     pen.set_pen_color('#EE7D16')
@@ -646,79 +667,102 @@ def start_animation():
     pen.goto(0, 140)
     pen.pen_down()
     pen.point_in_direction(112)
+    
     for i in range(8):
         pen.move(60)
         pen.turn_right(45)
+        pygame.display.flip()  # Update the screen after drawing
         pygame.time.wait(100)
+    
     pen.pen_up()
     pen.change_x_by(-20)
     pen.change_y_by(-30)
     pen.pen_down()
     pen.change_y_by(-40)
+    pygame.display.flip()  # Update the screen after drawing
     pen.pen_up()
-    pygame.time.wait(100)
     pen.change_x_by(40)
     pen.pen_down()
     pen.change_y_by(40)
+    pygame.display.flip()  # Update the screen after drawing
     pen.pen_up()
     pygame.time.wait(1000)
 
     # Draw the creator's name
     load_message_at("greenyman/presents...", -230, -90, 150, 50)
+    pygame.display.flip()  # Update the screen after drawing
     pygame.time.wait(1000)
+    
     load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
+    pygame.display.flip()  # Update the screen after drawing
     pygame.time.wait(1000)
+    
     load_message_at("greenyman/presents...", -230, -90, 150, 50)
+    pygame.display.flip()  # Update the screen after drawing
     pygame.time.wait(1000)
+    
     load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
+    pygame.display.flip()  # Update the screen after drawing
     
     pen.set_pen_size(80)
     pen.goto(-240, -100)
     pen.pen_down()
     pen.set_pen_color('#000000')
     pen.goto(240, -100)
+    pygame.display.flip()  # Update the screen after drawing
     pen.pen_up()
     pygame.time.wait(1000)
 
     for i in range(5):
         load_message_at("Neon/Ride", -200, -50, 300, 0)
+        pygame.display.flip()  # Update the screen after drawing
         pygame.time.wait(30)
+        
         load_message_at("Neon/Ride", -200, -50, 300, 0.1)
+        pygame.display.flip()  # Update the screen after drawing
         pygame.time.wait(30)
     
     load_message_at("Neon/Ride", -200, -50, 300, 0)
+    pygame.display.flip()  # Update the screen after drawing
     pygame.time.wait(3000)
     for i in range(15):
         pygame.time.wait(50)
         # TODO: Call move() function
-    
-
 
 
 # Main game loop
 running = True
 fullscreen = False
 
+# Original start of "when green flag clicked" section
 while running:
-    if start == 't':
-        pass # TODO: call game_screen()
-    elif start == 'i':
-        pass # TODO: call instruction_screen()
-    elif start == 'e':
-        pass # TODO: call emergency()
-    else:
-        pass # TODO: call menu_screen()
+    screen.fill((0, 0, 0))
+    start_animation()
 
-    if check_key_pressed('y'):
-        if not y_pressed:
-            if grid:
-                grid = False
-            else:
-                grid = True
+    while running:
+        screen.fill((0, 0, 0))
+        if start == 't':
+            pass # TODO: call game_screen()
+        elif start == 'i':
+            pass # TODO: call instruction_screen()
+        elif start == 'e':
+            pass # TODO: call emergency()
         else:
-            y_pressed = True
-    else:
-        y_pressed = False
+            pass # TODO: call menu_screen()
+
+        if check_key_pressed('y'):
+            if not y_pressed:
+                if grid:
+                    grid = False
+                else:
+                    grid = True
+            else:
+                y_pressed = True
+        else:
+            y_pressed = False
+        
+        # Refresh the display
+        pygame.display.flip()
 
 
 # Quit Pygame
