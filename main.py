@@ -1,5 +1,8 @@
 # Neon Ride: Platformer Game drawn with pen (originally from Scratch)
 
+# Note to self: All the display scaling stuff is useless
+# Just use this: https://stackoverflow.com/questions/68156731/how-to-avoid-automatic-resolution-adjustment-by-pygame-fullscreen
+
 import pygame
 import sys
 import math
