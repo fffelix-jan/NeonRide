@@ -3,13 +3,11 @@
 import pygame
 import sys
 import math
-import time
 
 # Constants
 NATIVE_WIDTH = 480
 NATIVE_HEIGHT = 360
 ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
-BACKGROUND_COLOR = (0, 0, 0)
 
 # Global variables
 move = 0
@@ -71,13 +69,13 @@ def scratch_to_pygame_coordinates(x, y):
 class Pen:
     def __init__(self, surface):
         self.surface = surface
-        self.x = 0
-        self.y = 0
-        self.direction = 90  # In degrees, 90 means right
+        self.x = NATIVE_WIDTH // 2
+        self.y = NATIVE_HEIGHT // 2
+        self.direction = 0  # In degrees, 0 means right
         self.pen_down_status = False
         self.pen_size = 1
-        self.pen_color = (0, 255, 0)  # Default color is green
-        self.pen_shade = 50  # Representing 50% shade (normal)
+        self.pen_color = (0, 0, 0)  # Default black
+        self.pen_shade = 100  # Representing 100% shade (normal)
         self.pen_visible_size = 15  # The pen's circle diameter for collision detection
 
         # Pen history for drawing
@@ -101,18 +99,12 @@ class Pen:
     # Helper method to scale coordinates
     def scale_coordinates(self, x, y):
         return scale_coordinates(x, y, self.scale_factor, self.x_offset, self.y_offset)
-    
-    # Helper method to convert Scratch coordinates to Pygame coordinates while scaling
-    # It first converts the Scratch coordinates to Pygame coordinates, then scales them using the scale_coordinates function
-    def scratch_to_scaled_pygame_coordinates(self, x, y):
-        pygame_x, pygame_y = scratch_to_pygame_coordinates(x, y)
-        return self.scale_coordinates(pygame_x, pygame_y)
 
     # Move pen to new position
     def goto(self, x, y):
-        new_x, new_y = self.scratch_to_scaled_pygame_coordinates(x, y)
-        if self.pen_down_status:
-            draw_scaled_rounded_line(self.surface, self.pen_color, self.scratch_to_scaled_pygame_coordinates(self.x, self.y), (new_x, new_y), self.pen_size, self.scale_factor, self.x_offset, self.y_offset)
+        new_x, new_y = self.scale_coordinates(*scratch_to_pygame_coordinates(x, y))
+        if self.pen_down:
+            draw_scaled_rounded_line(self.surface, self.pen_color, (self.x, self.y), (new_x, new_y), self.pen_size, self.scale_factor, self.x_offset, self.y_offset)
         self.x, self.y = x, y  # Update native coordinates
         self.last_pos = (self.x, self.y)  # Update for the next movement
 
@@ -156,7 +148,7 @@ class Pen:
 
     # Erase all
     def erase_all(self):
-        self.surface.fill(BACKGROUND_COLOR)
+        self.surface.fill((255, 255, 255))  # Fill screen with white
 
     # Adjust color brightness based on shade percentage
     def adjust_color_brightness(self, color, percent):
@@ -169,7 +161,7 @@ class Pen:
 
     # Check if pen is touching a specific color
     def touching_color(self, color):
-        scaled_x, scaled_y = self.scratch_to_scaled_pygame_coordinates(self.x, self.y)
+        scaled_x, scaled_y = self.scale_coordinates(*scratch_to_pygame_coordinates(self.x, self.y))
         pen_rect = pygame.Rect(scaled_x - self.pen_visible_size // 2,
                                scaled_y - self.pen_visible_size // 2,
                                self.pen_visible_size, self.pen_visible_size)
@@ -197,7 +189,7 @@ class Pen:
         # Convert Scratch's direction system to standard trigonometric angles:
         # 0 degrees is up, 90 is right, 180 is down, 270 is left.
         # We need to rotate this by -90 degrees for standard math angles.
-        radians = math.radians(self.direction)
+        radians = math.radians(90 - self.direction)
         
         # Calculate the new position using trigonometry
         delta_x = n * math.cos(radians)
@@ -616,76 +608,254 @@ def check_key_pressed(char):
     return keys[key_code]
 ## End of input functions
 
-# Main game loop
-running = True
-fullscreen = True
-
-# Testing code
-# Clear the screen
-pen.erase_all()
-
-# Set the pen properties
-pen.set_pen_color('#ff0000')  # Red
-pen.set_pen_size(3)
-
-# Testing code
-# Clear the screen
-pen.erase_all()
-
-# Set the pen properties
-pen.set_pen_color('#ff0000')  # Red
-pen.set_pen_size(3)
-
-# Define the characters to draw
-characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
-
-# Function to draw a circle using the pen
-def draw_circle(pen, radius):
-    circumference = 2 * math.pi * radius
-    steps = int(circumference / 2)  # Number of steps to approximate the circle
-    step_length = circumference / steps
-    step_angle = 360 / steps
-
+## Levels and screens
+# This function is complete
+def dark_field():
+    pen.pen_up()
+    pen.set_pen_size(15)
+    pen.goto(-240, -20)
     pen.pen_down()
-    for _ in range(steps):
-        pen.move(step_length)
-        pen.turn_right(step_angle)
-        pygame.display.flip()  # Update the display
-        #time.sleep(0.01)  # Pause for 0.01 seconds to see the drawing
+    pen.set_pen_color('#0A0D09')
+    pen.goto(240, -20)
+    pen.pen_up()
+    pen.set_pen_size(10)
+    pen.goto(0, 140)
+    pen.pen_down()
+    pen.point_in_direction(112)
+    for i in range(8):
+        pen.move(60)
+        pen.turn_right(45)
+    pen.pen_up()
+    pen.change_x_by(-20)
+    pen.change_y_by(-30)
+    pen.pen_down()
+    pen.change_y_by(-40)
+    pen.pen_up()
+    pen.change_x_by(40)
+    pen.pen_down()
+    pen.change_y_by(40)
     pen.pen_up()
 
-# Set the pen properties
-pen.set_pen_color('#ff0000')  # Red
-pen.set_pen_size(3)
+# This function is complete
+def move():
+    pen.erase_all()
+    pen.set_pen_size(15)
+    pen.goto(-240, -20)
+    pen.pen_down()
+    pen.set_pen_color('#4A6CD4')
+    pen.goto(240, -20)
+    pen.pen_up()
+    pen.goto(start_animation * 10, 140)
+    pen.set_pen_color('#EE7D16')
+    pen.set_pen_shade(50)
+    pen.set_pen_size(10)
+    pen.pen_down()
+    pen.point_in_direction(112)
+    for i in range(8):
+        pen.move(60)
+        pen.turn_right(45)
+    pen.pen_up()
+    pen.change_x_by(-5)
+    pen.change_y_by(-30)
+    pen.pen_down()
+    pen.change_y_by(-40)
+    pen.pen_up()
+    pen.change_x_by(40)
+    pen.pen_down()
+    pen.change_y_by(40)
+    pen.pen_up()
+    load_message_at("Neon/Ride", -200, -50, 300, 0)
+    start_animation += 1
+
+
+# Non-blocking animation function
+def start_animation():
+    global animation_step, animation_timer, current_state
+
+    dt = clock.tick(60)  # Limit to 60 FPS and get the time passed since the last frame
+    animation_timer += dt
+
+    if animation_step == 0:
+        pen.erase_all()
+        dark_field()
+        pygame.display.flip()
+        if animation_timer > 500:  # Wait 500ms
+            animation_step += 1
+            animation_timer = 0  # Reset timer for the next step
+    elif animation_step == 1:
+        pen.set_pen_size(15)
+        pen.goto(-240, -20)
+        pen.pen_down()
+        pen.set_pen_color('#4A6CD4')
+        pen.goto(240, -20)
+        pygame.display.flip()
+        pen.pen_up()
+        if animation_timer > 2000:  # Wait 2000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 2:
+        pen.set_pen_color('#EE7D16')
+        pen.set_pen_shade(50)
+        pen.set_pen_size(10)
+        pen.goto(0, 140)
+        pen.pen_down()
+        pen.point_in_direction(112)
+        
+        for i in range(8):
+            pen.move(60)
+            pen.turn_right(45)
+            pygame.display.flip()
+            pygame.time.wait(100)  # This can stay as a short delay
+
+        pen.pen_up()
+        pen.change_x_by(-20)
+        pen.change_y_by(-30)
+        pen.pen_down()
+        pen.change_y_by(-40)
+        pygame.display.flip()
+        pen.pen_up()
+        pen.change_x_by(40)
+        pen.pen_down()
+        pen.change_y_by(40)
+        pygame.display.flip()
+        pen.pen_up()
+        if animation_timer > 1000:  # Wait 1000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 3:
+        load_message_at("greenyman/presents...", -230, -90, 150, 50)
+        pygame.display.flip()
+        if animation_timer > 1000:  # Wait 1000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 4:
+        load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
+        pygame.display.flip()
+        if animation_timer > 1000:  # Wait 1000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 5:
+        load_message_at("greenyman/presents...", -230, -90, 150, 50)
+        pygame.display.flip()
+        if animation_timer > 1000:  # Wait 1000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 6:
+        pen.set_pen_size(80)
+        pen.goto(-240, -100)
+        pen.pen_down()
+        pen.set_pen_color('#000000')
+        pen.goto(240, -100)
+        pygame.display.flip()
+        pen.pen_up()
+        if animation_timer > 1000:  # Wait 1000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 7:
+        for i in range(5):
+            load_message_at("Neon/Ride", -200, -50, 300, 0)
+            pygame.display.flip()
+            pygame.time.wait(30)  # Short delay between text changes
+            
+            load_message_at("Neon/Ride", -200, -50, 300, 0.1)
+            pygame.display.flip()
+            pygame.time.wait(30)
+
+        load_message_at("Neon/Ride", -200, -50, 300, 0)
+        pygame.display.flip()
+        if animation_timer > 3000:  # Wait 3000ms
+            animation_step += 1
+            animation_timer = 0
+    elif animation_step == 8:
+        # Animation complete, transition to waiting for input state
+        current_state = STATE_WAITING_FOR_INPUT
+        print("Animation complete, waiting for input")
+
 
 # Main game loop
 running = True
 fullscreen = False
 
+# # Original start of "when green flag clicked" section
+# while running:
+#     for event in pygame.event.get():
+#         if event.type == pygame.QUIT:
+#             running = False
+#         elif event.type == pygame.KEYDOWN:
+#             if event.key == pygame.K_t:
+#                 start = 't'
+#             elif event.key == pygame.K_i:
+#                 start = 'i'
+#             elif event.key == pygame.K_e:
+#                 start = 'e'
+#             elif event.key == pygame.K_ESCAPE:
+#                 running = False
+
+#     # Clear the screen each frame
+#     screen.fill((0, 0, 0))
+
+#     # Handle different states
+#     if current_state == STATE_ANIMATION:
+#         start_animation()  # Run the animation
+#     elif current_state == STATE_WAITING_FOR_INPUT:
+#         # Handle input after animation ends
+#         if start == 't':
+#             print("Game Screen")
+#             current_state = STATE_GAME_SCREEN
+#         elif start == 'i':
+#             print("Instruction Screen")
+#             current_state = STATE_INSTRUCTION_SCREEN
+#         elif start == 'e':
+#             print("Emergency Screen")
+#             current_state = STATE_EMERGENCY
+#         else:
+#             print("Menu Screen")
+#             current_state = STATE_MENU_SCREEN
+
+#         # Handle 'y' key toggling the grid
+#         if check_key_pressed('y'):
+#             if not y_pressed:
+#                 grid = not grid  # Toggle the grid flag
+#                 y_pressed = True
+#         else:
+#             y_pressed = False
+
+#         # Display the grid toggle status (for debugging purposes)
+#         print(f"Grid is {'ON' if grid else 'OFF'}")
+
+#     # Refresh the display
+#     pygame.display.flip()
+
+# Testing code
+# Clear the screen
+pen.erase_all()
+
+# Draw the alphabet and digits in the middle of the screen
+alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
+size = 100  # Adjust font size as needed
+
+# Calculate the starting position for centering the text
+text_width = len(alphabet) * 15 * (size / 100)  # Approximate width of the text
+start_x = (NATIVE_WIDTH - text_width) / 2
+start_y = (NATIVE_HEIGHT - 30 * (size / 100)) / 2  # Approximate height of the text
+
+# Draw the entire alphabet and digits
+load_message_at(alphabet, start_x, start_y, size, 0)
+
+# Update the display
+pygame.display.flip()
+
+# Wait until the window is closed
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    pen.pen_up()
-    # Clear the screen with the background color
-    screen.fill(BACKGROUND_COLOR)
-    pen.set_pen_color('#00ff00')  # Green
-    pen.set_pen_size(3)
-    pen.pen_up()
 
-    # Draw the first circle on the left
-    pen.goto(-200, 0)  # Move to the left position
-    draw_circle(pen, 50)  # Draw a circle with radius 50
-    pen.pen_up()
-
-    pen.set_pen_color('#0000ff')  # Blue
-    pen.pen_up()
-    # Draw the second circle on the right
-    pen.goto(200, 0)  # Move to the right position
-    draw_circle(pen, 50)  # Draw a circle with radius 50
-    pen.pen_up()
-
-    pygame.display.flip()  # Update the display
-
-
+# Quit Pygame
 pygame.quit()
+sys.exit()
+
+
+# Quit Pygame
+pygame.quit()
+sys.exit()
