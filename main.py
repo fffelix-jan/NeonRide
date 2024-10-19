@@ -33,7 +33,7 @@ size = 0
 pygame.init()
 
 # Set initial window size
-screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE)
+screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED)
 pygame.display.set_caption("Neon Ride")
 
 # Frame rate control
@@ -86,11 +86,6 @@ class Pen:
         # Pen history for drawing
         self.last_pos = (self.x, self.y)  # Store the last position for line drawing
 
-        # Scaling factors (set initially)
-        self.scale_factor = 1
-        self.x_offset = 0
-        self.y_offset = 0
-
     # Turn clockwise by n degrees
     def turn_right(self, n):
         self.direction += n
@@ -101,21 +96,10 @@ class Pen:
         self.direction -= n
         self.direction %= 360
 
-    # Helper method to scale coordinates
-    def scale_coordinates(self, x, y):
-        return scale_coordinates(x, y, self.scale_factor, self.x_offset, self.y_offset)
-    
-    # Helper method to convert Scratch coordinates to Pygame coordinates while scaling
-    # It first converts the Scratch coordinates to Pygame coordinates, then scales them using the scale_coordinates function
-    def scratch_to_scaled_pygame_coordinates(self, x, y):
-        pygame_x, pygame_y = scratch_to_pygame_coordinates(x, y)
-        return self.scale_coordinates(pygame_x, pygame_y)
-
     # Move pen to new position
     def goto(self, x, y):
-        new_x, new_y = self.scratch_to_scaled_pygame_coordinates(x, y)
         if self.pen_down_status:
-            draw_scaled_rounded_line(self.surface, self.pen_color, self.scratch_to_scaled_pygame_coordinates(self.x, self.y), (new_x, new_y), self.pen_size, self.scale_factor, self.x_offset, self.y_offset)
+            draw_rounded_line(self.surface, self.pen_color, scratch_to_pygame_coordinates(self.x, self.y), scratch_to_pygame_coordinates(x, y), self.pen_size)
         self.x, self.y = x, y  # Update native coordinates
         self.last_pos = (self.x, self.y)  # Update for the next movement
 
@@ -164,18 +148,23 @@ class Pen:
     # Adjust color brightness based on shade percentage
     def adjust_color_brightness(self, color, percent):
         # Percent is between 0 and 100
-        factor = max(0, min(percent / 100, 1))  # Clamped between 0 and 1
-        new_color = pygame.Color(int(color.r * factor),
-                                 int(color.g * factor),
-                                 int(color.b * factor))
+        if percent < 50:
+            factor = percent / 50  # Scale between 0 and 1
+            new_color = pygame.Color(int(color.r * factor),
+                                    int(color.g * factor),
+                                    int(color.b * factor))
+        else:
+            factor = (percent - 50) / 50  # Scale between 0 and 1
+            new_color = pygame.Color(int(color.r + (255 - color.r) * factor),
+                                    int(color.g + (255 - color.g) * factor),
+                                    int(color.b + (255 - color.b) * factor))
         return new_color
 
     # Check if pen is touching a specific color
     def touching_color(self, color):
-        scaled_x, scaled_y = self.scratch_to_scaled_pygame_coordinates(self.x, self.y)
-        pen_rect = pygame.Rect(scaled_x - self.pen_visible_size // 2,
-                               scaled_y - self.pen_visible_size // 2,
-                               self.pen_visible_size, self.pen_visible_size)
+        pen_rect = pygame.Rect(self.x - self.pen_visible_size // 2,
+                            self.y - self.pen_visible_size // 2,
+                            self.pen_visible_size, self.pen_visible_size)
 
         # Get pixel array for current surface
         pixels = pygame.PixelArray(self.surface)
@@ -190,10 +179,6 @@ class Pen:
                     return True
         pixels.close()
         return False
-
-    # Update scaling factors
-    def update_scaling(self, scale_factor, x_offset, y_offset):
-        self.scale_factor, self.x_offset, self.y_offset = scale_factor, x_offset, y_offset
     
     # Move the pen n steps forward in the current direction
     def move(self, n):
@@ -213,71 +198,9 @@ class Pen:
 pen = Pen(screen)
 ## End of Pen class
 
-## Functions to aid display scaling (don't edit)
-# Function to get scaling factors and letterboxing
-def get_scaling_factors(screen_width, screen_height):
-    screen_aspect_ratio = screen_width / screen_height
-
-    if screen_aspect_ratio > ASPECT_RATIO:
-        # Letterbox on the sides (16:9 or wider)
-        scale_factor = screen_height / NATIVE_HEIGHT
-        scaled_width = int(NATIVE_WIDTH * scale_factor)
-        x_offset = (screen_width - scaled_width) // 2
-        y_offset = 0
-    else:
-        # Letterbox on the top and bottom
-        scale_factor = screen_width / NATIVE_WIDTH
-        scaled_height = int(NATIVE_HEIGHT * scale_factor)
-        x_offset = 0
-        y_offset = (screen_height - scaled_height) // 2
-
-    return scale_factor, x_offset, y_offset
-
-# Function to scale coordinates
-def scale_coordinates(x, y, scale_factor, x_offset, y_offset):
-    scaled_x = int(x * scale_factor) + x_offset
-    scaled_y = int(y * scale_factor) + y_offset
-    return scaled_x, scaled_y
-
-# Function to scale thickness (for neon lines)
-def scale_thickness(thickness, scale_factor):
-    return max(1, int(thickness * scale_factor))
-
-# Function to draw with scaling and letterboxing
-def draw_with_scaling(surface, color, start_pos, end_pos, thickness, scale_factor, x_offset, y_offset):
-    scaled_start = scale_coordinates(start_pos[0], start_pos[1], scale_factor, x_offset, y_offset)
-    scaled_end = scale_coordinates(end_pos[0], end_pos[1], scale_factor, x_offset, y_offset)
-    scaled_thickness = scale_thickness(thickness, scale_factor)
-    pygame.draw.line(surface, color, scaled_start, scaled_end, scaled_thickness)
-
-# Function to draw a scaled circle
-def draw_scaled_circle(surface, color, center, radius, scale_factor, x_offset, y_offset):
-    scaled_center = scale_coordinates(center[0], center[1], scale_factor, x_offset, y_offset)
-    scaled_radius = int(radius * scale_factor)
-    pygame.draw.circle(surface, color, scaled_center, scaled_radius)
-
-# Function to draw a scaled equilateral triangle
-def draw_scaled_equilateral_triangle(surface, color, center, side_length, scale_factor, x_offset, y_offset):
-    # Calculate the height of an equilateral triangle
-    height = (math.sqrt(3) / 2) * side_length
-    half_side = side_length / 2
-
-    # Calculate the three vertices of the triangle
-    p1 = (center[0], center[1] - height / 2)  # Top point
-    p2 = (center[0] - half_side, center[1] + height / 2)  # Bottom-left point
-    p3 = (center[0] + half_side, center[1] + height / 2)  # Bottom-right point
-
-    # Scale all points
-    p1_scaled = scale_coordinates(p1[0], p1[1], scale_factor, x_offset, y_offset)
-    p2_scaled = scale_coordinates(p2[0], p2[1], scale_factor, x_offset, y_offset)
-    p3_scaled = scale_coordinates(p3[0], p3[1], scale_factor, x_offset, y_offset)
-
-    # Draw the triangle
-    pygame.draw.polygon(surface, color, [p1_scaled, p2_scaled, p3_scaled])
-
-def draw_scaled_rounded_line(surface, color, start_pos, end_pos, thickness, scale_factor, x_offset, y_offset):
+def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
     """
-    Draws a scaled line with rounded ends.
+    Draws a line with rounded ends.
     
     Args:
         surface: The Pygame surface to draw on.
@@ -285,33 +208,25 @@ def draw_scaled_rounded_line(surface, color, start_pos, end_pos, thickness, scal
         start_pos: The starting position of the line (x, y).
         end_pos: The ending position of the line (x, y).
         thickness: The thickness of the line.
-        scale_factor: The scale factor for adjusting the size.
-        x_offset: The horizontal offset (for letterboxing).
-        y_offset: The vertical offset (for letterboxing).
-    """
-    # Scale the start and end points
-    scaled_start = scale_coordinates(start_pos[0], start_pos[1], scale_factor, x_offset, y_offset)
-    scaled_end = scale_coordinates(end_pos[0], end_pos[1], scale_factor, x_offset, y_offset)
-    
-    # Scale the thickness
-    scaled_thickness = scale_thickness(thickness, scale_factor)
-    
+    """   
     # Draw the main line
-    pygame.draw.line(surface, color, scaled_start, scaled_end, scaled_thickness)
+    pygame.draw.line(surface, color, start_pos, end_pos, round(thickness))
     
     # Draw circles at both ends to create rounded ends
-    radius = scaled_thickness // 2
-    draw_scaled_circle(surface, color, start_pos, radius, scale_factor, x_offset, y_offset)
-    draw_scaled_circle(surface, color, end_pos, radius, scale_factor, x_offset, y_offset)
-## End of functions to aid display scaling
+    radius = thickness / 2
+    pygame.draw.circle(surface, color, (start_pos[0] + thickness / 4, start_pos[1] + thickness / 4), radius)
+    pygame.draw.circle(surface, color, (end_pos[0] + thickness / 4, end_pos[1] + thickness / 4), radius)
+
 
 ## Functions to draw text
-def draw_letter(letter):
+def draw_letter(letter, size=100):
     if letter == '/':
         return
     letter = letter.lower() # Scratch uses case-insensitive letter comparison
     if not(letter == '.' or letter == '!' or letter == '-'):
         pen.pen_down()
+    else:
+        pen.pen_up()
 
     # GitHub Copilot seems to know most of this letter-drawing code by itself
     # Maybe someone ported this to Python before me...
@@ -580,26 +495,31 @@ def draw_letter(letter):
         pen.change_x_by(10 * (size / 100))
     else:
         print(f"WARN: Letter '{letter}' is not supported for drawing.")
+    pen.pen_up()
     # That's it for this super long function!
     # I'm surprised GitHub Copilot knew EXACTLY what I was gonna write next!
 
 
 # Function to draw a message at a specific location
 def load_message_at(message, x, y, font_size, color):
+    prev_status = pen.pen_down_status
+    pen.pen_up()
     pen.goto(x, y)
     size = font_size
+    if color == "0.1":
+        pen.set_pen_color('#202020')
+    elif color == "0.5":
+        pen.set_pen_color('#9C9EA2')
+    else:
+        pen.set_pen_color_scratch(color)
+        pen.set_pen_shade(50)
     for doods in range(len(message)):
-        if color == "0.1":
-            pen.set_pen_color('#202020')
-        elif color == "0.5":
-            pen.set_pen_color('#9C9EA2')
-        else:
-            pen.set_pen_color_scratch(color)
-            pen.set_pen_shade(50)
-        
         pen.set_pen_size(3 * (size / 100))
-        draw_letter(message[doods])
-        pen.goto(pen.x + (doods * 15) * (size / 100), pen.y)
+        draw_letter(message[doods], font_size)
+        pen.goto(x + ((doods + 1) * 15) * (size / 100), y)
+    
+    # Restore the previous pen status
+    pen.pen_down_status = prev_status
 
 
 ## Input functions
@@ -661,34 +581,36 @@ def draw_circle(pen, radius):
 pen.set_pen_color('#ff0000')  # Red
 pen.set_pen_size(3)
 
-# Main game loop
+# Main loop
 running = True
-fullscreen = False
-
 while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    pen.pen_up()
-    # Clear the screen with the background color
-    screen.fill(BACKGROUND_COLOR)
-    pen.set_pen_color('#00ff00')  # Green
-    pen.set_pen_size(3)
+
+    # Fill the background
+    screen.fill((255, 255, 255))
+
+    # Load message at the center of the screen
+    message = 'bye/calvin'
+    x = -230  # Adjust x to center the text
+    y = 0
+    font_size = 200
+    color = '50'
+    
+    
+    pen.goto(0,0)
+    pen.set_pen_color("#00FF00")
+    pen.pen_down()
+    pen.change_y_by(100)
+    pen.change_x_by(100)
+    pen.change_y_by(-100)
+    pen.change_x_by(-100)
+    load_message_at(message, x, y, font_size, color)
+
+    # Update the display
+    pygame.display.flip()
     pen.pen_up()
 
-    # Draw the first circle on the left
-    pen.goto(-200, 0)  # Move to the left position
-    draw_circle(pen, 50)  # Draw a circle with radius 50
-    pen.pen_up()
-
-    pen.set_pen_color('#0000ff')  # Blue
-    pen.pen_up()
-    # Draw the second circle on the right
-    pen.goto(200, 0)  # Move to the right position
-    draw_circle(pen, 50)  # Draw a circle with radius 50
-    pen.pen_up()
-
-    pygame.display.flip()  # Update the display
-
-
+# Quit Pygame
 pygame.quit()
