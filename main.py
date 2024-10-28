@@ -69,9 +69,9 @@ def scratch_to_pygame_coordinates(x, y):
     pygame_y = (NATIVE_HEIGHT // 2) - y
     return pygame_x, pygame_y
 
-## Pen class (used globally)
+## ScratchPen class (used globally)
 # This is a reimplmentation of the Scratch pen in Pygame
-class Pen:
+class ScratchPen:
     def __init__(self, surface):
         self.surface = surface
         self.x = 0
@@ -195,7 +195,7 @@ class Pen:
         self.goto(self.x + delta_x, self.y + delta_y)
 
 # Create a pen object
-pen = Pen(screen)
+pen = ScratchPen(screen)
 ## End of Pen class
 
 def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
@@ -281,7 +281,6 @@ def draw_letter(letter, size=100):
         pen.change_x_by(10 * (size / 100))
         pen.change_y_by(15 * (size / 100))
         pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
     elif letter == 'h':
         pen.change_y_by(-30 * (size / 100))
         pen.change_y_by(15 * (size / 100))
@@ -313,7 +312,7 @@ def draw_letter(letter, size=100):
     elif letter == 'm':
         pen.change_y_by(-30 * (size / 100))
         pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
+        pen.change_x_by(5 * (size / 100))
         pen.change_y_by(-15 * (size / 100))
         pen.change_y_by(15 * (size / 100))
         pen.change_x_by(5 * (size / 100))
@@ -438,6 +437,7 @@ def draw_letter(letter, size=100):
         pen.change_y_by(-15 * (size / 100))
         pen.change_x_by(5 * (size / 100))
         pen.pen_down()
+        pen.change_y_by(1 * (size / 100))
     elif letter == '1':
         pen.change_x_by(5 * (size / 100))
         pen.change_y_by(-30 * (size / 100))
@@ -551,36 +551,6 @@ pen.erase_all()
 pen.set_pen_color('#ff0000')  # Red
 pen.set_pen_size(3)
 
-# Testing code
-# Clear the screen
-pen.erase_all()
-
-# Set the pen properties
-pen.set_pen_color('#ff0000')  # Red
-pen.set_pen_size(3)
-
-# Define the characters to draw
-characters = 'abcdefghijklmnopqrstuvwxyz0123456789'
-
-# Function to draw a circle using the pen
-def draw_circle(pen, radius):
-    circumference = 2 * math.pi * radius
-    steps = int(circumference / 2)  # Number of steps to approximate the circle
-    step_length = circumference / steps
-    step_angle = 360 / steps
-
-    pen.pen_down()
-    for _ in range(steps):
-        pen.move(step_length)
-        pen.turn_right(step_angle)
-        pygame.display.flip()  # Update the display
-        #time.sleep(0.01)  # Pause for 0.01 seconds to see the drawing
-    pen.pen_up()
-
-# Set the pen properties
-pen.set_pen_color('#ff0000')  # Red
-pen.set_pen_size(3)
-
 # Main loop
 running = True
 while running:
@@ -592,10 +562,10 @@ while running:
     screen.fill((255, 255, 255))
 
     # Load message at the center of the screen
-    message = 'bye/calvin'
+    message = characters
     x = -230  # Adjust x to center the text
     y = 0
-    font_size = 200
+    font_size = 150
     color = '50'
     
     
