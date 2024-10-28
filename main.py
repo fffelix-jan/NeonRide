@@ -8,11 +8,13 @@ import sys
 import math
 import time
 
+from nrlevels import *
+
 # Constants
 NATIVE_WIDTH = 480
 NATIVE_HEIGHT = 360
 ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
-BACKGROUND_COLOR = (0, 0, 0)
+BACKGROUND_COLOR = (255, 255, 255)
 
 # Global variables
 move = 0
@@ -39,6 +41,13 @@ pygame.display.set_caption("Neon Ride")
 # Frame rate control
 clock = pygame.time.Clock()
 
+## Timers
+# Timers that trigger the different stages of the start animation
+START_ANI_STAGE_1_TIMER = pygame.USEREVENT + 1
+START_ANI_STAGE_2_TIMER = pygame.USEREVENT + 2
+## End of Timers
+
+
 # Game states
 STATE_ANIMATION = "animation"
 STATE_WAITING_FOR_INPUT = "waiting_for_input"
@@ -50,7 +59,6 @@ STATE_MENU_SCREEN = "menu_screen"
 # Variables to track state and animation progress
 current_state = STATE_ANIMATION
 animation_step = 0
-animation_timer = 0
 
 # Convert Scratch colour integer to hex code
 def scratch_color_to_hex(color_int):
@@ -539,6 +547,54 @@ def check_key_pressed(char):
     return keys[key_code]
 ## End of input functions
 
+
+## Screens 'n' stuff
+# Dark field - the initial dimmed state of the intro screen
+def dark_field():
+    pen.pen_up()
+    pen.set_pen_size(15)
+    pen.goto(-240, -20)
+    pen.pen_down()
+    pen.set_pen_color("#0A0D09")
+    pen.goto(240, -20)
+    pen.pen_up()
+    pen.set_pen_size(10)
+    pen.goto(0, 140)
+    pen.pen_down()
+    pen.point_in_direction(112)
+    for i in range(8):
+        pen.move(60)
+        pen.turn_right(45)
+    pen.pen_up()
+    pen.change_x_by(-20)
+    pen.change_y_by(-30)
+    pen.pen_down()
+    pen.change_y_by(-40)
+    pen.pen_up()
+    pen.change_x_by(40)
+    pen.pen_down()
+    pen.change_y_by(40)
+    pen.pen_up()
+
+
+def start_animation(state):
+    if state == 0:
+        pen.erase_all()
+        dark_field()
+        pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
+    elif state == 1:
+        pen.set_pen_size(15)
+        pen.goto(-240, -20)
+        pen.pen_down()
+        pen.set_pen_color("#4A6CD4")
+        pen.goto(240, -20)
+        pen.pen_up()
+        pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
+    elif state == 2:
+        start_animation = 1
+        
+## End of screens 'n' stuff
+
 # Main game loop
 running = True
 fullscreen = True
@@ -554,33 +610,13 @@ pen.set_pen_size(3)
 # Main loop
 running = True
 while running:
+    # Do not change any pen settings in the main loop.
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-
-    # Fill the background
-    screen.fill((255, 255, 255))
-
-    # Load message at the center of the screen
-    message = characters
-    x = -230  # Adjust x to center the text
-    y = 0
-    font_size = 150
-    color = '50'
-    
-    
-    pen.goto(0,0)
-    pen.set_pen_color("#00FF00")
-    pen.pen_down()
-    pen.change_y_by(100)
-    pen.change_x_by(100)
-    pen.change_y_by(-100)
-    pen.change_x_by(-100)
-    load_message_at(message, x, y, font_size, color)
-
-    # Update the display
+    start_animation(0)
     pygame.display.flip()
-    pen.pen_up()
+    clock.tick(60)
 
 # Quit Pygame
 pygame.quit()
