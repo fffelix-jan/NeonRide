@@ -14,7 +14,8 @@ from nrlevels import *
 NATIVE_WIDTH = 480
 NATIVE_HEIGHT = 360
 ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
-BACKGROUND_COLOR = (255, 255, 255)
+BACKGROUND_COLOR = (0, 0, 0)
+CHARACTER_COLOR = "#EE7D16"
 
 # Global variables
 move = 0
@@ -45,6 +46,8 @@ clock = pygame.time.Clock()
 # Timers that trigger the different stages of the start animation
 START_ANI_STAGE_1_TIMER = pygame.USEREVENT + 1
 START_ANI_STAGE_2_TIMER = pygame.USEREVENT + 2
+START_ANI_STATE_4_TO_11_TIMER = pygame.USEREVENT + 3
+START_ANI_STAGE_12_TIMER = pygame.USEREVENT + 4
 ## End of Timers
 
 
@@ -193,7 +196,7 @@ class ScratchPen:
         # Convert Scratch's direction system to standard trigonometric angles:
         # 0 degrees is up, 90 is right, 180 is down, 270 is left.
         # We need to rotate this by -90 degrees for standard math angles.
-        radians = math.radians(self.direction)
+        radians = math.radians(self.direction - 90)
         
         # Calculate the new position using trigonometry
         delta_x = n * math.cos(radians)
@@ -216,14 +219,15 @@ def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
         start_pos: The starting position of the line (x, y).
         end_pos: The ending position of the line (x, y).
         thickness: The thickness of the line.
-    """   
-    # Draw the main line
-    pygame.draw.line(surface, color, start_pos, end_pos, round(thickness))
-    
-    # Draw circles at both ends to create rounded ends
-    radius = thickness / 2
-    pygame.draw.circle(surface, color, (start_pos[0] + thickness / 4, start_pos[1] + thickness / 4), radius)
-    pygame.draw.circle(surface, color, (end_pos[0] + thickness / 4, end_pos[1] + thickness / 4), radius)
+    """
+    p1v = pygame.math.Vector2(start_pos)
+    p2v = pygame.math.Vector2(end_pos)
+    lv = (p2v - p1v).normalize()
+    lnv = pygame.math.Vector2(-lv.y, lv.x) * thickness // 2
+    pts = [p1v + lnv, p2v + lnv, p2v - lnv, p1v - lnv]
+    pygame.draw.polygon(surface, color, pts)
+    pygame.draw.circle(surface, color, start_pos, round(thickness / 2))
+    pygame.draw.circle(surface, color, end_pos, round(thickness / 2))
 
 
 ## Functions to draw text
@@ -577,21 +581,62 @@ def dark_field():
     pen.pen_up()
 
 
+
+timer_set = False
 def start_animation(state):
-    if state == 0:
-        pen.erase_all()
-        dark_field()
-        pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
-    elif state == 1:
-        pen.set_pen_size(15)
-        pen.goto(-240, -20)
-        pen.pen_down()
-        pen.set_pen_color("#4A6CD4")
-        pen.goto(240, -20)
-        pen.pen_up()
-        pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
-    elif state == 2:
-        start_animation = 1
+    global timer_set
+    global animation_step
+    if not timer_set:
+        if state == 0:
+            pen.erase_all()
+            dark_field()
+            print("Setting stage 1 timer")
+            pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
+            timer_set = True
+        elif state == 1:
+            pen.set_pen_size(15)
+            pen.goto(-240, -20)
+            pen.pen_down()
+            pen.set_pen_color("#4A6CD4")
+            pen.goto(240, -20)
+            pen.pen_up()
+            print("Setting stage 2 timer")
+            pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
+            timer_set = True
+        elif state == 2:
+            start_animation = 1
+            pen.set_pen_color(CHARACTER_COLOR)
+            pen.set_pen_shade(50)
+            pen.set_pen_size(10)
+            pen.goto(0, 140)
+            pen.pen_down()
+            pen.point_in_direction(112)
+            animation_step = 3
+        elif 3 <= state <= 10:
+            pen.move(60)
+            pen.turn_right(45)
+            print("Setting state 4 to 10 timer")
+            pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 100)
+            timer_set = True
+        elif state == 11:
+            pen.pen_up()
+            pen.change_x_by(-20)
+            pen.change_y_by(-30)
+            pen.pen_down()
+            pen.change_y_by(-40)
+            pen.pen_up()
+            pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 100)
+            timer_set = True
+        elif state == 12:
+            pen.change_x_by(40)
+            pen.pen_down()
+            pen.change_y_by(40)
+            pen.pen_up()
+            animation_step = 12
+
+            # Temporarily lock the function (for test)
+            timer_set = True
+
         
 ## End of screens 'n' stuff
 
@@ -614,7 +659,27 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-    start_animation(0)
+        elif event.type == START_ANI_STAGE_1_TIMER:
+            print("Stage 1 timer")
+            animation_step = 1
+            pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_2_TIMER:
+            print("Stage 2 timer")
+            animation_step = 2
+            pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STATE_4_TO_11_TIMER:
+            print("State 4 to 10 timer")
+            animation_step += 1
+            pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_12_TIMER:
+            print("Stage 12 timer")
+            animation_step = 12
+            pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 0)
+            timer_set = False
+    start_animation(animation_step)
     pygame.display.flip()
     clock.tick(60)
 
