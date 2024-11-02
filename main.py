@@ -3,10 +3,14 @@
 # Note to self: All the display scaling stuff is useless
 # Just use this: https://stackoverflow.com/questions/68156731/how-to-avoid-automatic-resolution-adjustment-by-pygame-fullscreen
 
+debug = True
+
 import pygame
 import sys
 import math
 import time
+if debug:
+    import platform
 
 from nrlevels import *
 
@@ -15,6 +19,7 @@ NATIVE_WIDTH = 480
 NATIVE_HEIGHT = 360
 ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
 BACKGROUND_COLOR = (0, 0, 0)
+OVERLAY_COLOR = (255, 255, 255)
 CHARACTER_COLOR = "#EE7D16"
 
 # Global variables
@@ -32,6 +37,11 @@ xvel = 0
 y_pressed = False
 size = 0
 
+# Function to print debug messages
+def debug_print(*args, **kwargs):
+    if debug:
+        print(*args, **kwargs)
+
 # Initialize Pygame
 pygame.init()
 
@@ -39,8 +49,33 @@ pygame.init()
 screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED)
 pygame.display.set_caption("Neon Ride")
 
+# Create an output buffer
+output_buffer = pygame.Surface((NATIVE_WIDTH, NATIVE_HEIGHT))
+
 # Frame rate control
 clock = pygame.time.Clock()
+
+# Create a separate surface for the debug overlay
+overlay_surface = pygame.Surface((250, 150), pygame.SRCALPHA)
+
+# Function to draw the debug overlay
+def draw_debug_overlay(overlay_surface, fps):
+    font = pygame.font.SysFont('Arial', 12)
+    overlay_text = [
+        f"Neon Ride++",
+        f"Python: {platform.python_version()}",
+        f"Pygame: {pygame.version.ver}",
+        f"FPS: {fps:.2f}"
+    ]
+    
+    # Clear the overlay surface
+    overlay_surface.fill((0, 0, 0, 0))
+
+    y_offset = 5
+    for line in overlay_text:
+        text_surface = font.render(line, True, OVERLAY_COLOR)
+        screen.blit(text_surface, (5, y_offset))
+        y_offset += 12
 
 ## Timers
 # Timers that trigger the different stages of the start animation
@@ -48,6 +83,10 @@ START_ANI_STAGE_1_TIMER = pygame.USEREVENT + 1
 START_ANI_STAGE_2_TIMER = pygame.USEREVENT + 2
 START_ANI_STATE_4_TO_11_TIMER = pygame.USEREVENT + 3
 START_ANI_STAGE_12_TIMER = pygame.USEREVENT + 4
+START_ANI_STAGE_13_TIMER = pygame.USEREVENT + 5
+START_ANI_STAGE_14_TIMER = pygame.USEREVENT + 6
+START_ANI_STAGE_15_TIMER = pygame.USEREVENT + 7
+START_ANI_STAGE_16_TIMER = pygame.USEREVENT + 8
 ## End of Timers
 
 
@@ -64,15 +103,37 @@ current_state = STATE_ANIMATION
 animation_step = 0
 
 # Convert Scratch colour integer to hex code
-def scratch_color_to_hex(color_int):
-    # Extract red, green, and blue components
-    r = (color_int // 65536) % 256
-    g = (color_int // 256) % 256
-    b = color_int % 256
+def scratch_color_to_hex(color_value):
+    # Hardcode the stupid color value that will just never be right
+    if color_value == 50:
+        return "#00FF00"
+    # Clamp the input value to ensure it is within the range 0-100
+    color_value = max(0, min(100, color_value))
     
-    # Convert to hex string
-    hex_code = f'#{r:02x}{g:02x}{b:02x}'
-    return hex_code
+    # Convert Scratch color value (0-100) to hue (0-360)
+    hue = color_value * 3.6  # Scale 0-100 to 0-360
+
+    # Compute the RGB values based on the hue
+    if hue < 60:
+        r, g, b = 1, hue / 60, 0
+    elif hue < 120:
+        r, g, b = 1 - (hue - 60) / 60, 1, 0
+    elif hue < 180:
+        r, g, b = 0, 1, (hue - 120) / 60
+    elif hue < 240:
+        r, g, b = 0, 1 - (hue - 180) / 60, 1
+    elif hue < 300:
+        r, g, b = (hue - 240) / 60, 0, 1
+    else:
+        r, g, b = 1, 0, 1 - (hue - 300) / 60
+    
+    # Scale the RGB values to the range [0, 255]
+    r = int(r * 255)
+    g = int(g * 255)
+    b = int(b * 255)
+    
+    # Format the RGB values as a hex code
+    return f"#{r:02X}{g:02X}{b:02X}"
 
 # Function to convert Scratch coordinates (center is 0,0) to Pygame coordinates (top-left is 0,0)
 def scratch_to_pygame_coordinates(x, y):
@@ -136,6 +197,7 @@ class ScratchPen:
     
     # Set pen color (Scratch color integer)
     def set_pen_color_scratch(self, color_int):
+        print(f"about to set the color to {scratch_color_to_hex(int(color_int))}")
         self.pen_color = pygame.Color(scratch_color_to_hex(int(color_int)))
 
     # Set pen shade
@@ -206,7 +268,7 @@ class ScratchPen:
         self.goto(self.x + delta_x, self.y + delta_y)
 
 # Create a pen object
-pen = ScratchPen(screen)
+pen = ScratchPen(output_buffer)
 ## End of Pen class
 
 def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
@@ -418,6 +480,8 @@ def draw_letter(letter, size=100):
     elif letter == '.':
         pen.change_y_by(-30 * (size / 100))
         pen.pen_down()
+        pen.point_in_direction(0)
+        pen.move(1)
     elif letter == '!':
         pen.change_x_by(5 * (size / 100))
         pen.pen_down()
@@ -425,6 +489,7 @@ def draw_letter(letter, size=100):
         pen.pen_up()
         pen.change_y_by(-10 * (size / 100))
         pen.pen_down()
+        pen.change_y_by(1 * (size / 100))
     elif letter == '?':
         pen.change_x_by(10 * (size / 100))
         pen.change_y_by(-15 * (size / 100))
@@ -433,6 +498,7 @@ def draw_letter(letter, size=100):
         pen.pen_up()
         pen.change_y_by(-10 * (size / 100))
         pen.pen_down()
+        pen.change_y_by(1 * (size / 100))
     elif letter == '"':
         pen.change_y_by(-10 * (size / 100))
         pen.pen_up()
@@ -524,9 +590,8 @@ def load_message_at(message, x, y, font_size, color):
         pen.set_pen_color('#9C9EA2')
     else:
         pen.set_pen_color_scratch(color)
-        pen.set_pen_shade(50)
     for doods in range(len(message)):
-        pen.set_pen_size(3 * (size / 100))
+        pen.set_pen_size(2.5 * (size / 100))
         draw_letter(message[doods], font_size)
         pen.goto(x + ((doods + 1) * 15) * (size / 100), y)
     
@@ -590,7 +655,7 @@ def start_animation(state):
         if state == 0:
             pen.erase_all()
             dark_field()
-            print("Setting stage 1 timer")
+            debug_print("Setting stage 1 timer")
             pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
             timer_set = True
         elif state == 1:
@@ -600,7 +665,7 @@ def start_animation(state):
             pen.set_pen_color("#4A6CD4")
             pen.goto(240, -20)
             pen.pen_up()
-            print("Setting stage 2 timer")
+            debug_print("Setting stage 2 timer")
             pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
             timer_set = True
         elif state == 2:
@@ -615,7 +680,7 @@ def start_animation(state):
         elif 3 <= state <= 10:
             pen.move(60)
             pen.turn_right(45)
-            print("Setting state 4 to 10 timer")
+            debug_print("Setting state 4 to 10 timer")
             pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 100)
             timer_set = True
         elif state == 11:
@@ -632,8 +697,22 @@ def start_animation(state):
             pen.pen_down()
             pen.change_y_by(40)
             pen.pen_up()
-            animation_step = 12
-
+            pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 1000)
+            timer_set = True
+        elif state == 13:
+            load_message_at("greenyman/presents...", -230, -90, 150, 50)
+            pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 1000)
+            timer_set = True
+        elif state == 14:
+            load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
+            pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 1000)
+            timer_set = True
+        elif state == 15:
+            load_message_at("greenyman/presents...", -230, -90, 150, 50)
+            pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 1000)
+            timer_set = True
+        elif state == 16:
+            load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
             # Temporarily lock the function (for test)
             timer_set = True
 
@@ -655,31 +734,67 @@ pen.set_pen_size(3)
 # Main loop
 running = True
 while running:
+    
     # Do not change any pen settings in the main loop.
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
         elif event.type == START_ANI_STAGE_1_TIMER:
-            print("Stage 1 timer")
+            debug_print("Stage 1 timer")
             animation_step = 1
             pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 0)
             timer_set = False
         elif event.type == START_ANI_STAGE_2_TIMER:
-            print("Stage 2 timer")
+            debug_print("Stage 2 timer")
             animation_step = 2
             pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 0)
             timer_set = False
         elif event.type == START_ANI_STATE_4_TO_11_TIMER:
-            print("State 4 to 10 timer")
+            debug_print("State 4 to 10 timer")
             animation_step += 1
             pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 0)
             timer_set = False
         elif event.type == START_ANI_STAGE_12_TIMER:
-            print("Stage 12 timer")
+            debug_print("Stage 12 timer")
             animation_step = 12
             pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 0)
             timer_set = False
+        elif event.type == START_ANI_STAGE_13_TIMER:
+            debug_print("Stage 13 timer")
+            animation_step = 13
+            pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_14_TIMER:
+            debug_print("Stage 14 timer")
+            animation_step = 14
+            pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_15_TIMER:
+            debug_print("Stage 15 timer")
+            animation_step = 15
+            pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_16_TIMER:
+            debug_print("Stage 16 timer")
+            animation_step = 16
+            pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 0)
+            timer_set = False
     start_animation(animation_step)
+
+    # Clear the screen
+    screen.fill(BACKGROUND_COLOR)
+
+    # Blit the output buffer onto the main screen
+    screen.blit(output_buffer, (0, 0))
+
+    # Calculate FPS
+    fps = clock.get_fps()
+    
+    # Draw the debug overlay
+    if debug:
+        draw_debug_overlay(overlay_surface, fps)
+        screen.blit(overlay_surface, (0, 0))
+    
     pygame.display.flip()
     clock.tick(60)
 
