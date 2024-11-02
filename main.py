@@ -45,6 +45,9 @@ def debug_print(*args, **kwargs):
 # Initialize Pygame
 pygame.init()
 
+# Initialize the mixer
+pygame.mixer.init()
+
 # Set initial window size
 screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED)
 pygame.display.set_caption("Neon Ride")
@@ -733,6 +736,11 @@ pen.set_pen_size(3)
 
 # Main loop
 running = True
+
+# Load and play the background music
+pygame.mixer.music.load("assets/sounds/nrmusic.mp3")
+pygame.mixer.music.play(-1)
+
 while running:
     
     # Do not change any pen settings in the main loop.
