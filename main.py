@@ -7,12 +7,13 @@ debug = True
 
 import pygame
 import sys
+import os
 import math
 import time
 if debug:
     import platform
 
-from nrlevels import *
+# from nrlevels import *
 
 # Constants
 NATIVE_WIDTH = 480
@@ -738,7 +739,7 @@ pen.set_pen_size(3)
 running = True
 
 # Load and play the background music
-pygame.mixer.music.load("assets/sounds/nrmusic.mp3")
+pygame.mixer.music.load(os.path.join(os.path.dirname(sys.argv[0]), "assets", "sounds", "nrmusic.mp3"))
 pygame.mixer.music.play(-1)
 
 while running:
