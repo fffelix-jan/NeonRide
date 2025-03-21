@@ -22,6 +22,8 @@ ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
 BACKGROUND_COLOR = (0, 0, 0)
 OVERLAY_COLOR = (255, 255, 255)
 CHARACTER_COLOR = "#EE7D16"
+ZERO_POINT_ONE_COLOR = "#202020"
+ZERO_POINT_FIVE_COLOR = "#9C9EA2"
 
 # Global variables
 move = 0
@@ -69,7 +71,7 @@ def draw_debug_overlay(overlay_surface, fps):
         f"Neon Ride++",
         f"Python: {platform.python_version()}",
         f"Pygame: {pygame.version.ver}",
-        f"FPS: {fps:.2f}"
+        f"FPS: {round(fps)}"
     ]
     
     # Clear the overlay surface
@@ -91,6 +93,8 @@ START_ANI_STAGE_13_TIMER = pygame.USEREVENT + 5
 START_ANI_STAGE_14_TIMER = pygame.USEREVENT + 6
 START_ANI_STAGE_15_TIMER = pygame.USEREVENT + 7
 START_ANI_STAGE_16_TIMER = pygame.USEREVENT + 8
+START_ANI_STAGE_17_TO_27_TIMER = pygame.USEREVENT + 9
+START_ANI_STAGE_27_TIMER = pygame.USEREVENT + 10
 ## End of Timers
 
 
@@ -108,35 +112,46 @@ animation_step = 0
 
 # Convert Scratch colour integer to hex code
 def scratch_color_to_hex(color_value):
-    # Hardcode the stupid color value that will just never be right
-    if color_value == 50:
-        return "#00FF00"
-    # Clamp the input value to ensure it is within the range 0-100
-    color_value = max(0, min(100, color_value))
-    
-    # Convert Scratch color value (0-100) to hue (0-360)
-    hue = color_value * 3.6  # Scale 0-100 to 0-360
+    # Handle Scratch's HSB color model (hue 0-100)
+    # Hue adjustment: Scratch's 50 → 120° (green), not 180°
+    scratch_hue = color_value % 100
+    saturation = 100  # Full saturation
+    brightness = 100  # Full brightness
 
-    # Compute the RGB values based on the hue
-    if hue < 60:
-        r, g, b = 1, hue / 60, 0
-    elif hue < 120:
-        r, g, b = 1 - (hue - 60) / 60, 1, 0
-    elif hue < 180:
-        r, g, b = 0, 1, (hue - 120) / 60
-    elif hue < 240:
-        r, g, b = 0, 1 - (hue - 180) / 60, 1
-    elif hue < 300:
-        r, g, b = (hue - 240) / 60, 0, 1
+    # Convert Scratch hue (0-100) to standard hue (0-360°)
+    # Adjusted scaling factor to map 50 → 120°
+    hue_degrees = scratch_hue * 2.4  # 50 * 2.4 = 120°
+    h = hue_degrees / 360.0  # Normalize to 0-1
+    s = saturation / 100.0
+    v = brightness / 100.0
+
+    # HSB-to-RGB conversion
+    if s == 0:
+        r = g = b = int(v * 255)
     else:
-        r, g, b = 1, 0, 1 - (hue - 300) / 60
+        h_i = int(h * 6)
+        f = h * 6 - h_i
+        p = v * (1 - s)
+        q = v * (1 - f * s)
+        t = v * (1 - (1 - f) * s)
+        
+        if h_i == 0:
+            r, g, b = v, t, p
+        elif h_i == 1:
+            r, g, b = q, v, p
+        elif h_i == 2:
+            r, g, b = p, v, t
+        elif h_i == 3:
+            r, g, b = p, q, v
+        elif h_i == 4:
+            r, g, b = t, p, v
+        else:
+            r, g, b = v, p, q
+        
+        r = int(r * 255)
+        g = int(g * 255)
+        b = int(b * 255)
     
-    # Scale the RGB values to the range [0, 255]
-    r = int(r * 255)
-    g = int(g * 255)
-    b = int(b * 255)
-    
-    # Format the RGB values as a hex code
     return f"#{r:02X}{g:02X}{b:02X}"
 
 # Function to convert Scratch coordinates (center is 0,0) to Pygame coordinates (top-left is 0,0)
@@ -588,10 +603,15 @@ def load_message_at(message, x, y, font_size, color):
     pen.pen_up()
     pen.goto(x, y)
     size = font_size
+    # This does not work properly, which is why the constants are used
     if color == "0.1":
         pen.set_pen_color('#202020')
     elif color == "0.5":
         pen.set_pen_color('#9C9EA2')
+    # If the color value is a hex code, set the pen color directly
+    elif isinstance(color, str) and color.startswith("#"):
+        pen.set_pen_color(color)
+    # If the color value is a Scratch color value, convert it to a hex code
     else:
         pen.set_pen_color_scratch(color)
     for doods in range(len(message)):
@@ -650,7 +670,7 @@ def dark_field():
     pen.pen_up()
 
 
-
+# Start animation
 timer_set = False
 def start_animation(state):
     global timer_set
@@ -664,10 +684,10 @@ def start_animation(state):
             timer_set = True
         elif state == 1:
             pen.set_pen_size(15)
-            pen.goto(-240, -20)
+            pen.goto(-5000, -20)
             pen.pen_down()
             pen.set_pen_color("#4A6CD4")
-            pen.goto(240, -20)
+            pen.goto(5000, -20)
             pen.pen_up()
             debug_print("Setting stage 2 timer")
             pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
@@ -708,7 +728,7 @@ def start_animation(state):
             pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 1000)
             timer_set = True
         elif state == 14:
-            load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
+            load_message_at("greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
             pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 1000)
             timer_set = True
         elif state == 15:
@@ -716,9 +736,35 @@ def start_animation(state):
             pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 1000)
             timer_set = True
         elif state == 16:
-            load_message_at("greenyman/presents...", -230, -90, 150, 0.1)
-            # Temporarily lock the function (for test)
+            load_message_at("greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
+            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 1000)
             timer_set = True
+            pen.set_pen_size(80)
+            pen.goto(-240, -100)
+            pen.pen_down()
+            pen.set_pen_color("#000000")
+            pen.goto(240, -100)
+            pen.pen_up()
+        elif 17 <= state <= 26:
+            # Flash the title
+            # Lit
+            if state % 2 == 1:
+                load_message_at("Neon/Ride", -200, -50, 300, 0)
+            # Not lit
+            else:
+                load_message_at("Neon/Ride", -200, -50, 300, ZERO_POINT_ONE_COLOR)
+            
+            # Set the next timer
+            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 30)
+            timer_set = True
+        elif state == 27:
+            # Light up the title
+            load_message_at("Neon/Ride", -200, -50, 300, 0)
+            pygame.time.set_timer(START_ANI_STAGE_27_TIMER, 1000)
+            timer_set = True
+        elif state == 28:
+            # TODO: keep going
+            pass
 
         
 ## End of screens 'n' stuff
@@ -788,6 +834,11 @@ while running:
             animation_step = 16
             pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 0)
             timer_set = False
+        elif event.type == START_ANI_STAGE_17_TO_27_TIMER:
+            debug_print("Stage 17 to 26 timer")
+            animation_step += 1
+            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 0)
+            timer_set = False
     start_animation(animation_step)
 
     # Clear the screen
@@ -805,7 +856,7 @@ while running:
         screen.blit(overlay_surface, (0, 0))
     
     pygame.display.flip()
-    clock.tick(60)
+    clock.tick(120)
 
 # Quit Pygame
 pygame.quit()
