@@ -16,8 +16,9 @@ if debug:
 # from nrlevels import *
 
 # Constants
-NATIVE_WIDTH = 480
-NATIVE_HEIGHT = 360
+NATIVE_WIDTH = 960
+NATIVE_HEIGHT = 720
+SCALE_FACTOR = 2
 ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
 BACKGROUND_COLOR = (0, 0, 0)
 OVERLAY_COLOR = (255, 255, 255)
@@ -61,11 +62,8 @@ output_buffer = pygame.Surface((NATIVE_WIDTH, NATIVE_HEIGHT))
 # Frame rate control
 clock = pygame.time.Clock()
 
-# Create a separate surface for the debug overlay
-overlay_surface = pygame.Surface((250, 150), pygame.SRCALPHA)
-
 # Function to draw the debug overlay
-def draw_debug_overlay(overlay_surface, fps):
+def draw_debug_overlay(fps):
     font = pygame.font.SysFont('Arial', 12)
     overlay_text = [
         f"Neon Ride++",
@@ -73,9 +71,6 @@ def draw_debug_overlay(overlay_surface, fps):
         f"Pygame: {pygame.version.ver}",
         f"FPS: {round(fps)}"
     ]
-    
-    # Clear the overlay surface
-    overlay_surface.fill((0, 0, 0, 0))
 
     y_offset = 5
     for line in overlay_text:
@@ -94,23 +89,25 @@ START_ANI_STAGE_14_TIMER = pygame.USEREVENT + 6
 START_ANI_STAGE_15_TIMER = pygame.USEREVENT + 7
 START_ANI_STAGE_16_TIMER = pygame.USEREVENT + 8
 START_ANI_STAGE_17_TO_27_TIMER = pygame.USEREVENT + 9
-START_ANI_STAGE_27_TIMER = pygame.USEREVENT + 10
+START_ANI_STAGE_28_TIMER = pygame.USEREVENT + 10
+START_ANI_STAGE_29_TO_43_TIMER = pygame.USEREVENT + 11
 ## End of Timers
 
 
 # Game states
-STATE_ANIMATION = "animation"
-STATE_WAITING_FOR_INPUT = "waiting_for_input"
-STATE_GAME_SCREEN = "game_screen"
-STATE_INSTRUCTION_SCREEN = "instruction_screen"
-STATE_EMERGENCY = "emergency"
-STATE_MENU_SCREEN = "menu_screen"
+STATE_ANIMATION = 0
+STATE_WAITING_FOR_INPUT = 1
+STATE_GAME_SCREEN = 2   # 't' in the original game
+STATE_INSTRUCTION_SCREEN = 3    # 'i' in the original game
+STATE_EMERGENCY = 4 # 'e' in the original game
+STATE_MENU_SCREEN = 5
 
 # Variables to track state and animation progress
 current_state = STATE_ANIMATION
 animation_step = 0
 
 # Convert Scratch colour integer to hex code
+# This still does not work properly, any help would be appreciated
 def scratch_color_to_hex(color_value):
     # Handle Scratch's HSB color model (hue 0-100)
     # Hue adjustment: Scratch's 50 → 120° (green), not 180°
@@ -156,8 +153,10 @@ def scratch_color_to_hex(color_value):
 
 # Function to convert Scratch coordinates (center is 0,0) to Pygame coordinates (top-left is 0,0)
 def scratch_to_pygame_coordinates(x, y):
-    pygame_x = x + (NATIVE_WIDTH // 2)
-    pygame_y = (NATIVE_HEIGHT // 2) - y
+    scaled_x = x * SCALE_FACTOR
+    scaled_y = y * SCALE_FACTOR
+    pygame_x = scaled_x + (NATIVE_WIDTH // 2)
+    pygame_y = (NATIVE_HEIGHT // 2) - scaled_y
     return pygame_x, pygame_y
 
 ## ScratchPen class (used globally)
@@ -301,6 +300,8 @@ def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
         end_pos: The ending position of the line (x, y).
         thickness: The thickness of the line.
     """
+    # Calculate scaled thickness
+    thickness = round(thickness * SCALE_FACTOR)
     p1v = pygame.math.Vector2(start_pos)
     p2v = pygame.math.Vector2(end_pos)
     lv = (p2v - p1v).normalize()
@@ -669,6 +670,35 @@ def dark_field():
     pen.change_y_by(40)
     pen.pen_up()
 
+# Character moving at end of start animation
+def move_start_animation(step):
+    pen.erase_all()
+    pen.set_pen_size(15)
+    pen.goto(-240, -20)
+    pen.pen_down()
+    pen.set_pen_color("#4A6CD4")
+    pen.goto(240, -20)
+    pen.pen_up()
+    pen.goto(step * 10, 140)
+    pen.set_pen_color(CHARACTER_COLOR)
+    pen.set_pen_shade(50)
+    pen.set_pen_size(10)
+    pen.pen_down()
+    pen.point_in_direction(112)
+    for i in range(8):
+        pen.move(60)
+        pen.turn_right(45)
+    pen.pen_up()
+    pen.change_x_by(-5)
+    pen.change_y_by(-30)
+    pen.pen_down()
+    pen.change_y_by(-40)
+    pen.pen_up()
+    pen.change_x_by(40)
+    pen.pen_down()
+    pen.change_y_by(40)
+    pen.pen_up()
+    load_message_at("Neon/Ride", -200, -50, 300, 0)
 
 # Start animation
 timer_set = False
@@ -760,12 +790,84 @@ def start_animation(state):
         elif state == 27:
             # Light up the title
             load_message_at("Neon/Ride", -200, -50, 300, 0)
-            pygame.time.set_timer(START_ANI_STAGE_27_TIMER, 1000)
+            pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 3000)
             timer_set = True
-        elif state == 28:
-            # TODO: keep going
-            pass
+        elif 28 <= state <= 43:
+            # Start the 0.05 s timer first
+            pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 50)
+            timer_set = True
+            # Call the title animation move function
+            debug_print(f"Calling move_start_animation with state {state - 27}")
+            move_start_animation(state - 27)
+        elif state == 44:
+            global enter_exit
+            global grid
+            global grid_size
+            global start
+            global level
+            global falling
+            global y
+            global x
+            global xvel
+            global current_state
+            # Prepare all the variables and exit the start animation
+            enter_exit = 1
+            grid = 1
+            grid_size = 100
+            start = STATE_MENU_SCREEN
+            level = 1
+            falling = False
+            y = 0
+            x = 0
+            xvel = 0
+            # Reset the timer set flag
+            timer_set = False
 
+            # Set the current state to the main menu screen
+            current_state = STATE_MENU_SCREEN
+        else:
+            debug_print("Invalid start animation state: " + str(state))
+            # Invalid state, draw debug text
+            font = pygame.font.SysFont('Arial', 24)
+            text_surface = font.render("Invalid start animation state: " + str(state), True, (255, 0, 0))
+            text_rect = text_surface.get_rect(center=(NATIVE_WIDTH // 2, NATIVE_HEIGHT // 2))  # Center the text
+            screen.blit(text_surface, text_rect)  # Draw the text at the centered position
+
+# Menu screen
+def menu_screen():
+    global timer_set
+    if not timer_set:
+        pen.erase_all()
+        pen.set_pen_size(50)
+        load_message_at("play", -210, 150, 500, 50)
+        load_message_at("instructions", -220, -70, 200, "#7F01FF")
+        load_message_at("press/in/case", 110, 30, 50, 0)
+        load_message_at("of/emergency", 113, 10, 50, 0)
+        clean_username = ''.join(filter(str.isalnum, os.getlogin()))
+        welcome_string = "Welcome/" + clean_username + "..."
+        load_message_at(welcome_string, 240 - len(welcome_string) * 7.5, -150, 50, len(clean_username) * 141)
+        pen.goto(155, 90)
+        pen.set_pen_size(80)
+        pen.set_pen_color("#F50E02")
+        pen.pen_down()
+        pen.move(1)
+        pen.pen_up()
+        # TODO: handle mouse input
+        timer_set = True
+
+# Invalid state screen
+def invalid_state_screen():
+    global timer_set
+    if not timer_set:
+        pen.erase_all()
+        # Invalid state
+        debug_print("Invalid game state: " + str(current_state))
+        # Invalid state, draw debug text
+        font = pygame.font.SysFont('Arial', 24)
+        text_surface = font.render("Invalid game state: " + str(current_state), True, (255, 0, 0))
+        text_rect = text_surface.get_rect(center=(NATIVE_WIDTH // 2, NATIVE_HEIGHT // 2))  # Center the text
+        output_buffer.blit(text_surface, text_rect)  # Draw the text at the centered position
+        timer_set = True
         
 ## End of screens 'n' stuff
 
@@ -789,6 +891,8 @@ pygame.mixer.music.load(os.path.join(os.path.dirname(sys.argv[0]), "assets", "so
 pygame.mixer.music.play(-1)
 
 while running:
+    # Clear the screen
+    screen.fill(BACKGROUND_COLOR)
     
     # Do not change any pen settings in the main loop.
     for event in pygame.event.get():
@@ -835,25 +939,44 @@ while running:
             pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 0)
             timer_set = False
         elif event.type == START_ANI_STAGE_17_TO_27_TIMER:
-            debug_print("Stage 17 to 26 timer")
+            debug_print("Stage 17 to 27 timer")
             animation_step += 1
             pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 0)
             timer_set = False
-    start_animation(animation_step)
+        elif event.type == START_ANI_STAGE_28_TIMER:
+            debug_print("Stage 28 timer")
+            animation_step = 28
+            pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 0)
+            timer_set = False
+        elif event.type == START_ANI_STAGE_29_TO_43_TIMER:
+            debug_print("Stage 29 to 43 timer")
+            animation_step += 1
+            pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 0)
+            timer_set = False
 
-    # Clear the screen
-    screen.fill(BACKGROUND_COLOR)
+    if current_state == STATE_ANIMATION:
+        start_animation(animation_step)
+    elif current_state == STATE_GAME_SCREEN:
+        pass # TODO: Add game code here
+    elif current_state == STATE_INSTRUCTION_SCREEN:
+        pass # TODO: Add instruction screen code here
+    elif current_state == STATE_EMERGENCY:
+        pass # TODO: Add emergency screen code here
+    elif current_state == STATE_MENU_SCREEN:
+        menu_screen()
+    else:
+        invalid_state_screen()
 
     # Blit the output buffer onto the main screen
-    screen.blit(output_buffer, (0, 0))
+    scaled_buffer = pygame.transform.scale(output_buffer, (NATIVE_WIDTH, NATIVE_HEIGHT))
+    screen.blit(scaled_buffer, (0, 0))
 
     # Calculate FPS
     fps = clock.get_fps()
     
     # Draw the debug overlay
     if debug:
-        draw_debug_overlay(overlay_surface, fps)
-        screen.blit(overlay_surface, (0, 0))
+        draw_debug_overlay(fps)
     
     pygame.display.flip()
     clock.tick(120)
