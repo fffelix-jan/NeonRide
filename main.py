@@ -13,18 +13,18 @@ import time
 if debug:
     import platform
 
-# from nrlevels import *
+from nrutil import *
+from scratch_pen import *
+from nrlevels import *
+from nrconstants import *
 
-# Constants
-NATIVE_WIDTH = 960
-NATIVE_HEIGHT = 720
-SCALE_FACTOR = 2
-ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
-BACKGROUND_COLOR = (0, 0, 0)
-OVERLAY_COLOR = (255, 255, 255)
-CHARACTER_COLOR = "#EE7D16"
-ZERO_POINT_ONE_COLOR = "#202020"
-ZERO_POINT_FIVE_COLOR = "#9C9EA2"
+# Get the base path for bundled assets
+if getattr(sys, 'frozen', False):
+    # Running in a PyInstaller bundle
+    base_path = sys._MEIPASS
+else:
+    # Running in development
+    base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Global variables
 move = 0
@@ -47,6 +47,7 @@ def debug_print(*args, **kwargs):
         print(*args, **kwargs)
 
 # Initialize Pygame
+pygame.display.set_caption("Neon Ride")
 pygame.init()
 
 # Initialize the mixer
@@ -54,7 +55,6 @@ pygame.mixer.init()
 
 # Set initial window size
 screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED)
-pygame.display.set_caption("Neon Ride")
 
 # Create an output buffer
 output_buffer = pygame.Surface((NATIVE_WIDTH, NATIVE_HEIGHT))
@@ -93,535 +93,13 @@ START_ANI_STAGE_28_TIMER = pygame.USEREVENT + 10
 START_ANI_STAGE_29_TO_43_TIMER = pygame.USEREVENT + 11
 ## End of Timers
 
-
-# Game states
-STATE_ANIMATION = 0
-STATE_WAITING_FOR_INPUT = 1
-STATE_GAME_SCREEN = 2   # 't' in the original game
-STATE_INSTRUCTION_SCREEN = 3    # 'i' in the original game
-STATE_EMERGENCY = 4 # 'e' in the original game
-STATE_MENU_SCREEN = 5
-
 # Variables to track state and animation progress
 current_state = STATE_ANIMATION
 animation_step = 0
 
-# Convert Scratch colour integer to hex code
-# This still does not work properly, any help would be appreciated
-def scratch_color_to_hex(color_value):
-    # Handle Scratch's HSB color model (hue 0-100)
-    # Hue adjustment: Scratch's 50 → 120° (green), not 180°
-    scratch_hue = color_value % 100
-    saturation = 100  # Full saturation
-    brightness = 100  # Full brightness
-
-    # Convert Scratch hue (0-100) to standard hue (0-360°)
-    # Adjusted scaling factor to map 50 → 120°
-    hue_degrees = scratch_hue * 2.4  # 50 * 2.4 = 120°
-    h = hue_degrees / 360.0  # Normalize to 0-1
-    s = saturation / 100.0
-    v = brightness / 100.0
-
-    # HSB-to-RGB conversion
-    if s == 0:
-        r = g = b = int(v * 255)
-    else:
-        h_i = int(h * 6)
-        f = h * 6 - h_i
-        p = v * (1 - s)
-        q = v * (1 - f * s)
-        t = v * (1 - (1 - f) * s)
-        
-        if h_i == 0:
-            r, g, b = v, t, p
-        elif h_i == 1:
-            r, g, b = q, v, p
-        elif h_i == 2:
-            r, g, b = p, v, t
-        elif h_i == 3:
-            r, g, b = p, q, v
-        elif h_i == 4:
-            r, g, b = t, p, v
-        else:
-            r, g, b = v, p, q
-        
-        r = int(r * 255)
-        g = int(g * 255)
-        b = int(b * 255)
-    
-    return f"#{r:02X}{g:02X}{b:02X}"
-
-# Function to convert Scratch coordinates (center is 0,0) to Pygame coordinates (top-left is 0,0)
-def scratch_to_pygame_coordinates(x, y):
-    scaled_x = x * SCALE_FACTOR
-    scaled_y = y * SCALE_FACTOR
-    pygame_x = scaled_x + (NATIVE_WIDTH // 2)
-    pygame_y = (NATIVE_HEIGHT // 2) - scaled_y
-    return pygame_x, pygame_y
-
-## ScratchPen class (used globally)
-# This is a reimplmentation of the Scratch pen in Pygame
-class ScratchPen:
-    def __init__(self, surface):
-        self.surface = surface
-        self.x = 0
-        self.y = 0
-        self.direction = 90  # In degrees, 90 means right
-        self.pen_down_status = False
-        self.pen_size = 1
-        self.pen_color = (0, 255, 0)  # Default color is green
-        self.pen_shade = 50  # Representing 50% shade (normal)
-        self.pen_visible_size = 15  # The pen's circle diameter for collision detection
-
-        # Pen history for drawing
-        self.last_pos = (self.x, self.y)  # Store the last position for line drawing
-
-    # Turn clockwise by n degrees
-    def turn_right(self, n):
-        self.direction += n
-        self.direction %= 360
-    
-    # Turn counter-clockwise by n degrees
-    def turn_left(self, n):
-        self.direction -= n
-        self.direction %= 360
-
-    # Move pen to new position
-    def goto(self, x, y):
-        if self.pen_down_status:
-            draw_rounded_line(self.surface, self.pen_color, scratch_to_pygame_coordinates(self.x, self.y), scratch_to_pygame_coordinates(x, y), self.pen_size)
-        self.x, self.y = x, y  # Update native coordinates
-        self.last_pos = (self.x, self.y)  # Update for the next movement
-
-    # Change x by n
-    def change_x_by(self, n):
-        self.goto(self.x + n, self.y)
-
-    # Change y by n
-    def change_y_by(self, n):
-        self.goto(self.x, self.y + n)
-
-    # Point pen in a specific direction (in degrees)
-    def point_in_direction(self, degrees):
-        self.direction = degrees
-
-    # Set pen size
-    def set_pen_size(self, size):
-        self.pen_size = size
-
-    # Set pen color (hex code)
-    def set_pen_color(self, hex_code):
-        self.pen_color = pygame.Color(hex_code)
-    
-    # Set pen color (Scratch color integer)
-    def set_pen_color_scratch(self, color_int):
-        print(f"about to set the color to {scratch_color_to_hex(int(color_int))}")
-        self.pen_color = pygame.Color(scratch_color_to_hex(int(color_int)))
-
-    # Set pen shade
-    def set_pen_shade(self, shade_percent):
-        self.pen_shade = shade_percent
-        # Adjust the brightness of the color based on the shade
-        self.pen_color = self.adjust_color_brightness(self.pen_color, shade_percent)
-
-    # Pen down
-    def pen_down(self):
-        self.pen_down_status = True
-
-    # Pen up
-    def pen_up(self):
-        self.pen_down_status = False
-
-    # Erase all
-    def erase_all(self):
-        self.surface.fill(BACKGROUND_COLOR)
-
-    # Adjust color brightness based on shade percentage
-    def adjust_color_brightness(self, color, percent):
-        # Percent is between 0 and 100
-        if percent < 50:
-            factor = percent / 50  # Scale between 0 and 1
-            new_color = pygame.Color(int(color.r * factor),
-                                    int(color.g * factor),
-                                    int(color.b * factor))
-        else:
-            factor = (percent - 50) / 50  # Scale between 0 and 1
-            new_color = pygame.Color(int(color.r + (255 - color.r) * factor),
-                                    int(color.g + (255 - color.g) * factor),
-                                    int(color.b + (255 - color.b) * factor))
-        return new_color
-
-    # Check if pen is touching a specific color
-    def touching_color(self, color):
-        pen_rect = pygame.Rect(self.x - self.pen_visible_size // 2,
-                            self.y - self.pen_visible_size // 2,
-                            self.pen_visible_size, self.pen_visible_size)
-
-        # Get pixel array for current surface
-        pixels = pygame.PixelArray(self.surface)
-
-        # Loop through the pen's area to check for the color
-        for x in range(pen_rect.left, pen_rect.right):
-            for y in range(pen_rect.top, pen_rect.bottom):
-                if x < 0 or y < 0 or x >= self.surface.get_width() or y >= self.surface.get_height():
-                    continue  # Skip out-of-bounds pixels
-                if pixels[x, y] == self.surface.map_rgb(color):
-                    pixels.close()
-                    return True
-        pixels.close()
-        return False
-    
-    # Move the pen n steps forward in the current direction
-    def move(self, n):
-        # Convert Scratch's direction system to standard trigonometric angles:
-        # 0 degrees is up, 90 is right, 180 is down, 270 is left.
-        # We need to rotate this by -90 degrees for standard math angles.
-        radians = math.radians(self.direction - 90)
-        
-        # Calculate the new position using trigonometry
-        delta_x = n * math.cos(radians)
-        delta_y = -n * math.sin(radians)  # Negating because in pygame, positive y is down
-        
-        # Move the pen to the new position
-        self.goto(self.x + delta_x, self.y + delta_y)
-
 # Create a pen object
 pen = ScratchPen(output_buffer)
 ## End of Pen class
-
-def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
-    """
-    Draws a line with rounded ends.
-    
-    Args:
-        surface: The Pygame surface to draw on.
-        color: The color of the line.
-        start_pos: The starting position of the line (x, y).
-        end_pos: The ending position of the line (x, y).
-        thickness: The thickness of the line.
-    """
-    # Calculate scaled thickness
-    thickness = round(thickness * SCALE_FACTOR)
-    p1v = pygame.math.Vector2(start_pos)
-    p2v = pygame.math.Vector2(end_pos)
-    lv = (p2v - p1v).normalize()
-    lnv = pygame.math.Vector2(-lv.y, lv.x) * thickness // 2
-    pts = [p1v + lnv, p2v + lnv, p2v - lnv, p1v - lnv]
-    pygame.draw.polygon(surface, color, pts)
-    pygame.draw.circle(surface, color, start_pos, round(thickness / 2))
-    pygame.draw.circle(surface, color, end_pos, round(thickness / 2))
-
-
-## Functions to draw text
-def draw_letter(letter, size=100):
-    if letter == '/':
-        return
-    letter = letter.lower() # Scratch uses case-insensitive letter comparison
-    if not(letter == '.' or letter == '!' or letter == '-'):
-        pen.pen_down()
-    else:
-        pen.pen_up()
-
-    # GitHub Copilot seems to know most of this letter-drawing code by itself
-    # Maybe someone ported this to Python before me...
-    if letter == 'a':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-    elif letter == 'b':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-13 * (size / 100))
-        pen.change_y_by(13 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(8 * (size / 100))
-        pen.change_x_by(-8 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(13 * (size / 100))
-    elif letter == 'c':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == 'd':
-        pen.change_x_by(8 * (size / 100))
-        pen.change_x_by(-8 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(28 * (size / 100))
-    elif letter == 'e':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == 'f':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-    elif letter == 'g':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-    elif letter == 'h':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-    elif letter == 'i':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == 'j':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-    elif letter == 'k':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(10 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-    elif letter == 'l':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == 'm':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-    elif letter == 'n':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-    elif letter == 'o':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == 'p':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == 'q':
-        pen.change_y_by(-25 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-5 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == 'r':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(8 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-    elif letter == 's':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == 't':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-    elif letter == 'u':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-    elif letter == 'v':
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(2 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(6 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(2 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-    elif letter == 'w':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-    elif letter == 'x':
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(10 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_y_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-    elif letter == 'y':
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-    elif letter == 'z':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == '.':
-        pen.change_y_by(-30 * (size / 100))
-        pen.pen_down()
-        pen.point_in_direction(0)
-        pen.move(1)
-    elif letter == '!':
-        pen.change_x_by(5 * (size / 100))
-        pen.pen_down()
-        pen.change_y_by(-20 * (size / 100))
-        pen.pen_up()
-        pen.change_y_by(-10 * (size / 100))
-        pen.pen_down()
-        pen.change_y_by(1 * (size / 100))
-    elif letter == '?':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-5 * (size / 100))
-        pen.change_y_by(-5 * (size / 100))
-        pen.pen_up()
-        pen.change_y_by(-10 * (size / 100))
-        pen.pen_down()
-        pen.change_y_by(1 * (size / 100))
-    elif letter == '"':
-        pen.change_y_by(-10 * (size / 100))
-        pen.pen_up()
-        pen.change_y_by(10 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.pen_down()
-        pen.change_y_by(-10 * (size / 100))
-    elif letter == '0':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.pen_up()
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.pen_down()
-        pen.change_y_by(1 * (size / 100))
-    elif letter == '1':
-        pen.change_x_by(5 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(5 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == '2':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-20 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == '3':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == '4':
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-    elif letter == '5':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-10 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-20 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == '6':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-    elif letter == '7':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-    elif letter == '8':
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(30 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(-15 * (size / 100))
-        pen.change_x_by(10 * (size / 100))
-    elif letter == '9':
-        pen.change_x_by(10 * (size / 100))
-        pen.change_y_by(-30 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-        pen.change_x_by(-10 * (size / 100))
-        pen.change_y_by(15 * (size / 100))
-    elif letter == '-':
-        pen.change_y_by(-15 * (size / 100))
-        pen.pen_down()
-        pen.change_x_by(10 * (size / 100))
-    else:
-        print(f"WARN: Letter '{letter}' is not supported for drawing.")
-    pen.pen_up()
-    # That's it for this super long function!
-    # I'm surprised GitHub Copilot knew EXACTLY what I was gonna write next!
-
-
-# Function to draw a message at a specific location
-def load_message_at(message, x, y, font_size, color):
-    prev_status = pen.pen_down_status
-    pen.pen_up()
-    pen.goto(x, y)
-    size = font_size
-    # This does not work properly, which is why the constants are used
-    if color == "0.1":
-        pen.set_pen_color('#202020')
-    elif color == "0.5":
-        pen.set_pen_color('#9C9EA2')
-    # If the color value is a hex code, set the pen color directly
-    elif isinstance(color, str) and color.startswith("#"):
-        pen.set_pen_color(color)
-    # If the color value is a Scratch color value, convert it to a hex code
-    else:
-        pen.set_pen_color_scratch(color)
-    for doods in range(len(message)):
-        pen.set_pen_size(2.5 * (size / 100))
-        draw_letter(message[doods], font_size)
-        pen.goto(x + ((doods + 1) * 15) * (size / 100), y)
-    
-    # Restore the previous pen status
-    pen.pen_down_status = prev_status
 
 
 ## Input functions
@@ -698,20 +176,20 @@ def move_start_animation(step):
     pen.pen_down()
     pen.change_y_by(40)
     pen.pen_up()
-    load_message_at("Neon/Ride", -200, -50, 300, 0)
+    load_message_at(pen, "Neon/Ride", -200, -50, 300, 0)
 
 # Start animation
-timer_set = False
+setup_complete = False
 def start_animation(state):
-    global timer_set
+    global setup_complete
     global animation_step
-    if not timer_set:
+    if not setup_complete:
         if state == 0:
             pen.erase_all()
             dark_field()
             debug_print("Setting stage 1 timer")
             pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
-            timer_set = True
+            setup_complete = True
         elif state == 1:
             pen.set_pen_size(15)
             pen.goto(-5000, -20)
@@ -721,7 +199,7 @@ def start_animation(state):
             pen.pen_up()
             debug_print("Setting stage 2 timer")
             pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
-            timer_set = True
+            setup_complete = True
         elif state == 2:
             start_animation = 1
             pen.set_pen_color(CHARACTER_COLOR)
@@ -736,7 +214,7 @@ def start_animation(state):
             pen.turn_right(45)
             debug_print("Setting state 4 to 10 timer")
             pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 100)
-            timer_set = True
+            setup_complete = True
         elif state == 11:
             pen.pen_up()
             pen.change_x_by(-20)
@@ -745,30 +223,30 @@ def start_animation(state):
             pen.change_y_by(-40)
             pen.pen_up()
             pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 100)
-            timer_set = True
+            setup_complete = True
         elif state == 12:
             pen.change_x_by(40)
             pen.pen_down()
             pen.change_y_by(40)
             pen.pen_up()
             pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 1000)
-            timer_set = True
+            setup_complete = True
         elif state == 13:
-            load_message_at("greenyman/presents...", -230, -90, 150, 50)
+            load_message_at(pen, "greenyman/presents...", -230, -90, 150, 50)
             pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 1000)
-            timer_set = True
+            setup_complete = True
         elif state == 14:
-            load_message_at("greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
+            load_message_at(pen, "greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
             pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 1000)
-            timer_set = True
+            setup_complete = True
         elif state == 15:
-            load_message_at("greenyman/presents...", -230, -90, 150, 50)
+            load_message_at(pen, "greenyman/presents...", -230, -90, 150, 50)
             pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 1000)
-            timer_set = True
+            setup_complete = True
         elif state == 16:
-            load_message_at("greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
+            load_message_at(pen, "greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
             pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 1000)
-            timer_set = True
+            setup_complete = True
             pen.set_pen_size(80)
             pen.goto(-240, -100)
             pen.pen_down()
@@ -779,23 +257,23 @@ def start_animation(state):
             # Flash the title
             # Lit
             if state % 2 == 1:
-                load_message_at("Neon/Ride", -200, -50, 300, 0)
+                load_message_at(pen, "Neon/Ride", -200, -50, 300, 0)
             # Not lit
             else:
-                load_message_at("Neon/Ride", -200, -50, 300, ZERO_POINT_ONE_COLOR)
+                load_message_at(pen, "Neon/Ride", -200, -50, 300, ZERO_POINT_ONE_COLOR)
             
             # Set the next timer
             pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 30)
-            timer_set = True
+            setup_complete = True
         elif state == 27:
             # Light up the title
-            load_message_at("Neon/Ride", -200, -50, 300, 0)
+            load_message_at(pen, "Neon/Ride", -200, -50, 300, 0)
             pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 3000)
-            timer_set = True
+            setup_complete = True
         elif 28 <= state <= 43:
             # Start the 0.05 s timer first
             pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 50)
-            timer_set = True
+            setup_complete = True
             # Call the title animation move function
             debug_print(f"Calling move_start_animation with state {state - 27}")
             move_start_animation(state - 27)
@@ -820,12 +298,13 @@ def start_animation(state):
             y = 0
             x = 0
             xvel = 0
-            # Reset the timer set flag
-            timer_set = False
+            # Reset the setup complete flag
+            setup_complete = False
 
             # Set the current state to the main menu screen
             current_state = STATE_MENU_SCREEN
         else:
+            # This code should never be reached
             debug_print("Invalid start animation state: " + str(state))
             # Invalid state, draw debug text
             font = pygame.font.SysFont('Arial', 24)
@@ -835,30 +314,59 @@ def start_animation(state):
 
 # Menu screen
 def menu_screen():
-    global timer_set
-    if not timer_set:
+    global setup_complete
+    global current_state
+
+    if not setup_complete:
         pen.erase_all()
         pen.set_pen_size(50)
-        load_message_at("play", -210, 150, 500, 50)
-        load_message_at("instructions", -220, -70, 200, "#7F01FF")
-        load_message_at("press/in/case", 110, 30, 50, 0)
-        load_message_at("of/emergency", 113, 10, 50, 0)
+        load_message_at(pen, "play", -210, 150, 500, 50)
+        load_message_at(pen, "instructions", -220, -70, 200, "#7F01FF")
+        load_message_at(pen, "press/in/case", 110, 30, 50, 0)
+        load_message_at(pen, "of/emergency", 113, 10, 50, 0)
         clean_username = ''.join(filter(str.isalnum, os.getlogin()))
         welcome_string = "Welcome/" + clean_username + "..."
-        load_message_at(welcome_string, 240 - len(welcome_string) * 7.5, -150, 50, len(clean_username) * 141)
+        load_message_at(pen, welcome_string, 240 - len(welcome_string) * 7.5, -150, 50, len(clean_username) * 141)
         pen.goto(155, 90)
         pen.set_pen_size(80)
         pen.set_pen_color("#F50E02")
         pen.pen_down()
         pen.move(1)
         pen.pen_up()
-        # TODO: handle mouse input
-        timer_set = True
+        setup_complete = True
+
+# Draw the grid
+def draw_grid():
+    pen.set_pen_size(1)
+    pen.set_pen_color("#656565")
+    pen.pen_up()
+    pen.goto((x + 240) % grid_size - 240, 180)
+    for i in range(480 // grid_size + 1):
+        pen.pen_down()
+        pen.goto(x, -180)
+        pen.pen_up()
+        pen.goto(x + grid_size, 180)
+    pen.goto(-240, (y + 180) % grid_size - 180)
+    for i in range(360 // grid_size + 1):
+        pen.pen_down()
+        pen.goto(240, y)
+        pen.pen_up()
+        pen.goto(-240, y + grid_size)
+
+# Game screen
+def game_screen():
+    pen.erase_all()
+    if grid:
+        draw_grid()
+    # Call the code in nrlevels.py to load the level
+    # QUESTION: What variables must be passed to the load_level function in nrlevels.py?
+    # ANSWER: The variables that must be passed to the load_level function in nrlevels.py are the level number and the pen object.
+    
 
 # Invalid state screen
 def invalid_state_screen():
-    global timer_set
-    if not timer_set:
+    global setup_complete
+    if not setup_complete:
         pen.erase_all()
         # Invalid state
         debug_print("Invalid game state: " + str(current_state))
@@ -867,7 +375,7 @@ def invalid_state_screen():
         text_surface = font.render("Invalid game state: " + str(current_state), True, (255, 0, 0))
         text_rect = text_surface.get_rect(center=(NATIVE_WIDTH // 2, NATIVE_HEIGHT // 2))  # Center the text
         output_buffer.blit(text_surface, text_rect)  # Draw the text at the centered position
-        timer_set = True
+        setup_complete = True
         
 ## End of screens 'n' stuff
 
@@ -887,8 +395,12 @@ pen.set_pen_size(3)
 running = True
 
 # Load and play the background music
-pygame.mixer.music.load(os.path.join(os.path.dirname(sys.argv[0]), "assets", "sounds", "nrmusic.mp3"))
-pygame.mixer.music.play(-1)
+music_path = os.path.join(base_path, "assets", "sounds", "nrmusic.mp3")
+if os.path.exists(music_path):
+    pygame.mixer.music.load(music_path)
+    pygame.mixer.music.play(-1)
+else:
+    print(f"Error: Music file not found at {music_path}")
 
 while running:
     # Clear the screen
@@ -902,57 +414,83 @@ while running:
             debug_print("Stage 1 timer")
             animation_step = 1
             pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_2_TIMER:
             debug_print("Stage 2 timer")
             animation_step = 2
             pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STATE_4_TO_11_TIMER:
             debug_print("State 4 to 10 timer")
             animation_step += 1
             pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_12_TIMER:
             debug_print("Stage 12 timer")
             animation_step = 12
             pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_13_TIMER:
             debug_print("Stage 13 timer")
             animation_step = 13
             pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_14_TIMER:
             debug_print("Stage 14 timer")
             animation_step = 14
             pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_15_TIMER:
             debug_print("Stage 15 timer")
             animation_step = 15
             pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_16_TIMER:
             debug_print("Stage 16 timer")
             animation_step = 16
             pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_17_TO_27_TIMER:
             debug_print("Stage 17 to 27 timer")
             animation_step += 1
             pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_28_TIMER:
             debug_print("Stage 28 timer")
             animation_step = 28
             pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 0)
-            timer_set = False
+            setup_complete = False
         elif event.type == START_ANI_STAGE_29_TO_43_TIMER:
             debug_print("Stage 29 to 43 timer")
             animation_step += 1
             pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 0)
-            timer_set = False
+            setup_complete = False
+    
+        # Mouse event handler on the menu screen
+        # Handle mouse clicks for the menu screen
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if current_state == STATE_MENU_SCREEN:
+                mouse_x, mouse_y = event.pos
+                scratch_x, scratch_y = pygame_to_scratch_coordinates(mouse_x, mouse_y)
+                debug_print(f"Mouse clicked at ({scratch_x}, {scratch_y})")
+                
+                # Check Play button (approximate coordinates)
+                if -200 < scratch_x < 80 and -30 < scratch_y < 150:
+                    current_state = STATE_GAME_SCREEN
+                    setup_complete = False
+                    debug_print("Switching to game screen")
+                # Check Instructions button
+                elif -220 < scratch_x < 140 and -70 < scratch_y < -60:
+                    current_state = STATE_INSTRUCTION_SCREEN
+                    setup_complete = False
+                    debug_print("Switching to instruction screen")
+                # Check Emergency button (circle around (155, 90))
+                elif math.sqrt((scratch_x - 155)**2 + (scratch_y - 90)**2) < 40:
+                    current_state = STATE_EMERGENCY
+                    setup_complete = False
+                    debug_print("Switching to emergency state")
+                else:
+                    debug_print("Clicked outside buttons")
 
     if current_state == STATE_ANIMATION:
         start_animation(animation_step)

@@ -1,0 +1,27 @@
+# Display and Scaling Constants
+NATIVE_WIDTH = 960
+NATIVE_HEIGHT = 720
+SCALE_FACTOR = 2
+ASPECT_RATIO = NATIVE_WIDTH / NATIVE_HEIGHT
+
+# Colors
+BACKGROUND_COLOR = (0, 0, 0)
+OVERLAY_COLOR = (255, 255, 255)
+CHARACTER_COLOR = "#EE7D16"
+ZERO_POINT_ONE_COLOR = "#202020"
+ZERO_POINT_FIVE_COLOR = "#9C9EA2"
+LEVEL_COLOR = "#4A6CD4"
+
+# Game States
+STATE_ANIMATION = 0
+STATE_WAITING_FOR_INPUT = 1
+STATE_GAME_SCREEN = 2   # 't' in the original game
+STATE_INSTRUCTION_SCREEN = 3    # 'i' in the original game
+STATE_EMERGENCY = 4 # 'e' in the original game
+STATE_MENU_SCREEN = 5
+
+# Grid Settings
+GRID_SIZE = 100
+
+# Debug Settings
+DEBUG = True
