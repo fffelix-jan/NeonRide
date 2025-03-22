@@ -94,16 +94,27 @@ class ScratchPen:
                                     int(color.b + (255 - color.b) * factor))
         return new_color
 
-    # Check if pen is touching a specific color
-    def touching_color(self, color):
-        pen_rect = pygame.Rect(self.x - self.pen_visible_size // 2,
-                            self.y - self.pen_visible_size // 2,
-                            self.pen_visible_size, self.pen_visible_size)
+    # Check if pen is touching a specific color with a specified hitbox
+    def touching_color(self, color, hitbox_dimensions):
+        # Check if color is a hex code string starting with '#' and convert to RGB
+        if isinstance(color, str) and color.startswith("#"):
+            color = pygame.Color(color)
+
+        # Extract hitbox width and height
+        hitbox_width, hitbox_height = hitbox_dimensions
+
+        # Define the hitbox rectangle centered on the pen's position
+        pen_rect = pygame.Rect(
+            self.x - hitbox_width // 2,
+            self.y - hitbox_height // 2,
+            hitbox_width,
+            hitbox_height
+        )
 
         # Get pixel array for current surface
         pixels = pygame.PixelArray(self.surface)
 
-        # Loop through the pen's area to check for the color
+        # Loop through the hitbox area to check for the color
         for x in range(pen_rect.left, pen_rect.right):
             for y in range(pen_rect.top, pen_rect.bottom):
                 if x < 0 or y < 0 or x >= self.surface.get_width() or y >= self.surface.get_height():

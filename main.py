@@ -32,14 +32,19 @@ time_global = 0
 enter_exit = 1
 grid = False
 grid_size = 100
-start = 'f'
+start = STATE_ANIMATION
 level = 1
 falling = False
+remember = -4
+jump = 10
 y = 0
 x = 0
 xvel = 0
 y_pressed = False
+t_pressed = False
+q_pressed = 0
 size = 0
+doods = 0
 
 # Function to print debug messages
 def debug_print(*args, **kwargs):
@@ -91,6 +96,7 @@ START_ANI_STAGE_16_TIMER = pygame.USEREVENT + 8
 START_ANI_STAGE_17_TO_27_TIMER = pygame.USEREVENT + 9
 START_ANI_STAGE_28_TIMER = pygame.USEREVENT + 10
 START_ANI_STAGE_29_TO_43_TIMER = pygame.USEREVENT + 11
+GAME_REDRAW_TIMER = pygame.USEREVENT + 12
 ## End of Timers
 
 # Variables to track state and animation progress
@@ -104,16 +110,45 @@ pen = ScratchPen(output_buffer)
 
 ## Input functions
 # Function to check if a key is pressed
-def check_key_pressed(char):
+def check_key_pressed(key):
+    """
+    Check if a specific key is pressed.
+    
+    Args:
+        key (str or int): The key to check. Can be a character (e.g., 'a') or a Pygame key constant (e.g., pygame.K_LEFT).
+    
+    Returns:
+        bool: True if the key is pressed, False otherwise.
+    
+    Raises:
+        ValueError: If the key is invalid.
+    """
     # Get the current state of all keys
     keys = pygame.key.get_pressed()
     
-    # Convert the input character to its corresponding pygame key code
-    key_code = getattr(pygame, f'K_{char.lower()}', None)
+    # Handle arrow keys and other special keys
+    if isinstance(key, str):
+        # Convert the input character to its corresponding pygame key code
+        if key.lower() in ['left', 'right', 'up', 'down']:
+            # Map arrow key names to Pygame constants
+            arrow_keys = {
+                'left': pygame.K_LEFT,
+                'right': pygame.K_RIGHT,
+                'up': pygame.K_UP,
+                'down': pygame.K_DOWN
+            }
+            key_code = arrow_keys.get(key.lower())
+        else:
+            # Handle regular alphanumeric keys
+            key_code = getattr(pygame, f'K_{key.lower()}', None)
+    elif isinstance(key, int):
+        # Assume the input is already a Pygame key constant
+        key_code = key
+    else:
+        raise ValueError(f"Invalid key type: {type(key)}. Expected str or int.")
     
     if key_code is None:
-        # Invalid key character
-        raise ValueError(f"The character '{char}' is not a valid key.")
+        raise ValueError(f"The key '{key}' is not a valid key.")
     
     # Check if the specified key is pressed
     return keys[key_code]
@@ -353,11 +388,161 @@ def draw_grid():
         pen.pen_up()
         pen.goto(-240, y + grid_size)
 
+# Death
+def death():
+    global x, y
+    if enter_exit == 1:
+        y = 0
+        x = 0
+    else:
+        x = goal_x[level - 1]
+        y = goal_y[level - 1]
+
+# Falling
+def fall():
+    global falling, remember, time_global, y
+    if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+        falling = False
+        pen.pen_up()
+        remember = 0
+        while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) or pen.y > 170:
+            y -= 1
+            pen.change_y_by(1)
+            remember -= 1
+        pen.change_y_by(remember)
+        y += 4
+        pen.pen_down()
+        # Check if up arrow is pressed
+        if check_key_pressed('up'):
+            y -= 10
+    else:
+        if not falling:
+            time_global = 0
+            # Check if the up arrow is pressed
+            if check_key_pressed('up'):
+                jump = 10
+            else:
+                jump = 0
+        falling = True
+        if (15 * (time * time)) - jump > 12:
+            y += 12
+        else:
+            y += (15 * (time * time)) - jump
+
+# Sensing
+def sensing():
+    global y, jump, enter_exit, level, x, time_global, xvel
+    if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
+        death()
+    if pen.direction == 112 and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+        jump = 0
+        y += 5
+    elif pen.direction == -68:
+        fall()
+        if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
+            if abs(x) > 200:
+                enter_exit = 1
+                level += 1
+                x = 0
+                y = 0
+            else:
+                enter_exit = 2
+                level -= 1
+                x = goal_x[level - 1]
+                y = goal_y[level - 1]
+    elif pen.direction == -158:
+        # Check if right arrow is pressed
+        if check_key_pressed('right') and not(pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel < 0):
+            xvel -= 5
+        if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+            if xvel < 0:
+                xvel = 0
+            # Check if up and left are pressed simultaneously
+            if check_key_pressed('up') and check_key_pressed('left'):
+                time_global = 0.1
+                xvel = 5
+    elif pen.direction == 22:
+        # Check if left arrow is pressed
+        if check_key_pressed('left') and not(pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel > 0):
+            xvel += 5
+        if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+            if xvel > 0:
+                xvel = 0
+            # Check if up and right are pressed simultaneously
+            if check_key_pressed('up') and check_key_pressed('right'):
+                time_global = 0.1
+                xvel = -5
+
+# Function that draws the character in the game
+# Originally just titled "C"
+def draw_character_with_sensing():
+    global doods
+    pen.point_in_direction(112)
+    doods = 0
+    pen.set_pen_size(3)
+    pen.set_pen_color(CHARACTER_COLOR)
+    pen.pen_up()
+    pen.goto(0, 15)
+    pen.pen_down()
+    for i in range(8):
+        sensing()
+        pen.move(8)
+        pen.turn_right(45)
+    pen.pen_up()
+    pen.goto(-0.2 * xvel - 3, 10)
+    pen.pen_down()
+    pen.change_y_by(-5)
+    pen.pen_up()
+    pen.goto(-0.2 * xvel + 3, 10)
+    pen.pen_down()
+    pen.change_y_by(-5)
+
+# Game timeout timer
+def timeout_tick():
+    global time_global, y, move
+    time_global += 0.05
+    move += 1
+    # Check if time up or 'r' key is pressed
+    if y > 500 or check_key_pressed('r'):
+        death()
+
 # Game screen
 def game_screen():
+    global x, y, xvel, level, grid, t_pressed, q_pressed, enter_exit, falling, start, grid_size
     pen.erase_all()
     if grid:
         draw_grid()
+    load_level(level, x, y, pen)
+    draw_character_with_sensing()
+    # "hide edges" originally called here
+    x += xvel
+    xvel /= 1.5
+    # Check if 't' key is pressed
+    if check_key_pressed('t'):
+        if not t_pressed:
+            t_pressed = True
+            if grid_size > 150:
+                grid_size = 10
+            else:
+                grid_size += 10
+    else:
+        t_pressed = False
+    if check_key_pressed('q'):
+        q_pressed += 1
+        if q_pressed >= 40:
+            # If held long enough, switch to the menu screen
+            enter_exit = 1
+            level = 1
+            falling = False
+            y = 0
+            x = 0
+            xvel = 0
+            start = STATE_MENU_SCREEN
+            q_pressed = 0
+    else:
+        q_pressed = 0
+    timeout_tick()
+    
     # Call the code in nrlevels.py to load the level
     # QUESTION: What variables must be passed to the load_level function in nrlevels.py?
     # ANSWER: The variables that must be passed to the load_level function in nrlevels.py are the level number and the pen object.
@@ -495,7 +680,7 @@ while running:
     if current_state == STATE_ANIMATION:
         start_animation(animation_step)
     elif current_state == STATE_GAME_SCREEN:
-        pass # TODO: Add game code here
+        game_screen()
     elif current_state == STATE_INSTRUCTION_SCREEN:
         pass # TODO: Add instruction screen code here
     elif current_state == STATE_EMERGENCY:
@@ -517,7 +702,7 @@ while running:
         draw_debug_overlay(fps)
     
     pygame.display.flip()
-    clock.tick(120)
+    clock.tick(60)
 
 # Quit Pygame
 pygame.quit()
