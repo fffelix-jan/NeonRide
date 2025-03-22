@@ -3,20 +3,18 @@
 # Note to self: All the display scaling stuff is useless
 # Just use this: https://stackoverflow.com/questions/68156731/how-to-avoid-automatic-resolution-adjustment-by-pygame-fullscreen
 
-debug = True
+from nrutil import *
+from scratch_pen import *
+from nrlevels import *
+from nrconstants import *
 
 import pygame
 import sys
 import os
 import math
 import time
-if debug:
+if DEBUG:
     import platform
-
-from nrutil import *
-from scratch_pen import *
-from nrlevels import *
-from nrconstants import *
 
 # Get the base path for bundled assets
 if getattr(sys, 'frozen', False):
@@ -48,7 +46,7 @@ doods = 0
 
 # Function to print debug messages
 def debug_print(*args, **kwargs):
-    if debug:
+    if DEBUG:
         print(*args, **kwargs)
 
 # Initialize Pygame
@@ -74,7 +72,8 @@ def draw_debug_overlay(fps):
         f"Neon Ride++",
         f"Python: {platform.python_version()}",
         f"Pygame: {pygame.version.ver}",
-        f"FPS: {round(fps)}"
+        f"FPS: {round(fps)}",
+        f"X: {x}, Y: {y}",
     ]
 
     y_offset = 5
@@ -101,7 +100,7 @@ GAME_REDRAW_TIMER = pygame.USEREVENT + 12
 
 # Variables to track state and animation progress
 current_state = STATE_ANIMATION
-animation_step = 0
+animation_step = 40
 
 # Create a pen object
 pen = ScratchPen(output_buffer)
@@ -150,6 +149,10 @@ def check_key_pressed(key):
     if key_code is None:
         raise ValueError(f"The key '{key}' is not a valid key.")
     
+    # Debug print to verify key presses
+    if keys[key_code]:
+        debug_print(f"Key pressed: {key}")
+
     # Check if the specified key is pressed
     return keys[key_code]
 ## End of input functions
@@ -375,18 +378,24 @@ def draw_grid():
     pen.set_pen_size(1)
     pen.set_pen_color("#656565")
     pen.pen_up()
-    pen.goto((x + 240) % grid_size - 240, 180)
-    for i in range(480 // grid_size + 1):
+
+    # Vertical lines
+    start_x = -240 + (x % grid_size)
+    for i in range((NATIVE_WIDTH // grid_size) + 2):
+        current_x = start_x + i * grid_size
+        pen.goto(current_x, -180)
         pen.pen_down()
-        pen.goto(x, -180)
+        pen.goto(current_x, 180)
         pen.pen_up()
-        pen.goto(x + grid_size, 180)
-    pen.goto(-240, (y + 180) % grid_size - 180)
-    for i in range(360 // grid_size + 1):
+
+    # Horizontal lines
+    start_y = -180 + (y % grid_size)
+    for i in range((NATIVE_HEIGHT // grid_size) + 2):
+        current_y = start_y + i * grid_size
+        pen.goto(-240, current_y)
         pen.pen_down()
-        pen.goto(240, y)
+        pen.goto(240, current_y)
         pen.pen_up()
-        pen.goto(-240, y + grid_size)
 
 # Death
 def death():
@@ -400,78 +409,99 @@ def death():
 
 # Falling
 def fall():
-    global falling, remember, time_global, y
+    return
+    global falling, remember, time_global, y, jump
+
     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
         falling = False
         pen.pen_up()
         remember = 0
+        # Move player upwards until no longer colliding
         while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) or pen.y > 170:
-            y -= 1
-            pen.change_y_by(1)
-            remember -= 1
-        pen.change_y_by(remember)
-        y += 4
+            y += 1  # Move up in Scratch's coordinate system (increase y)
+            pen.change_y_by(1)  # Move pen up
+            remember += 1  # Track how many steps we moved up
         pen.pen_down()
-        # Check if up arrow is pressed
-        if check_key_pressed('up'):
-            y -= 10
     else:
         if not falling:
             time_global = 0
-            # Check if the up arrow is pressed
             if check_key_pressed('up'):
                 jump = 10
             else:
                 jump = 0
         falling = True
-        if (15 * (time * time)) - jump > 12:
-            y += 12
-        else:
-            y += (15 * (time * time)) - jump
+        # Apply gravity
+        y += (15 * (time_global ** 2)) - jump
 
 # Sensing
 def sensing():
     global y, jump, enter_exit, level, x, time_global, xvel
+
+    # Debug prints
+    debug_print(f"Before sensing: xvel={xvel}, y={y}")
+
+    # Collision with lava
     if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
         death()
-    if pen.direction == 112 and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+
+    # Collision with level (ground)
+    if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
         jump = 0
-        y += 5
-    elif pen.direction == -68:
+        y += 5  # Sink slightly into the ground to prevent floating
+
+    # Falling logic
+    if not pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
         fall()
-        if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
-            if abs(x) > 200:
-                enter_exit = 1
-                level += 1
-                x = 0
-                y = 0
-            else:
-                enter_exit = 2
-                level -= 1
-                x = goal_x[level - 1]
-                y = goal_y[level - 1]
-    elif pen.direction == -158:
-        # Check if right arrow is pressed
-        if check_key_pressed('right') and not(pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel < 0):
-            xvel -= 5
+
+    # Collision with goal
+    if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
+        if abs(x) > 200:
+            enter_exit = 1
+            level += 1
+            x = 0
+            y = 0
+        else:
+            enter_exit = 2
+            level -= 1
+            x = goal_x[level - 1]
+            y = goal_y[level - 1]
+
+    # Handle right movement
+    if check_key_pressed('right'):
+        xvel -= 0.5  # Move right
         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-            if xvel < 0:
-                xvel = 0
-            # Check if up and left are pressed simultaneously
-            if check_key_pressed('up') and check_key_pressed('left'):
-                time_global = 0.1
-                xvel = 5
-    elif pen.direction == 22:
-        # Check if left arrow is pressed
-        if check_key_pressed('left') and not(pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel > 0):
-            xvel += 5
+            xvel = 0  # Stop if colliding with a wall
+
+    # Handle left movement
+    if check_key_pressed('left'):
+        xvel += 0.5  # Move left
         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-            if xvel > 0:
-                xvel = 0
-            # Check if up and right are pressed simultaneously
-            if check_key_pressed('up') and check_key_pressed('right'):
-                time_global = 0.1
-                xvel = -5
+            xvel = 0  # Stop if colliding with a wall
+
+    # Handle jumping
+    if check_key_pressed('up') and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+        jump = 10
+        y -= jump  # Apply jump force
+
+    # Debug prints
+    debug_print(f"After sensing: xvel={xvel}, y={y}")
+
+# Debug flying mode
+def debug_fly():
+    global x, y
+    # Use W, A, S, D keys to move the character in debug mode
+    if check_key_pressed('w'):
+        debug_print("W key pressed")
+        y -= 1
+    if check_key_pressed('s'):
+        debug_print("S key pressed")
+        y += 1
+    if check_key_pressed('a'):
+        debug_print("A key pressed")
+        x += 1
+    if check_key_pressed('d'):
+        debug_print("D key pressed")
+        x -= 1
 
 # Function that draws the character in the game
 # Originally just titled "C"
@@ -486,6 +516,8 @@ def draw_character_with_sensing():
     pen.pen_down()
     for i in range(8):
         sensing()
+        if DEBUG:
+            debug_fly()
         pen.move(8)
         pen.turn_right(45)
     pen.pen_up()
@@ -514,10 +546,15 @@ def game_screen():
         draw_grid()
     load_level(level, x, y, pen)
     draw_character_with_sensing()
-    # "hide edges" originally called here
+
+    # Debug prints to verify xvel and y
+    debug_print(f"xvel: {xvel}, y: {y}")
+
+    # Apply xvel to x
     x += xvel
-    xvel /= 1.5
-    # Check if 't' key is pressed
+    xvel /= 1.5  # Apply friction to xvel
+
+    # Handle grid size toggle
     if check_key_pressed('t'):
         if not t_pressed:
             t_pressed = True
@@ -527,10 +564,11 @@ def game_screen():
                 grid_size += 10
     else:
         t_pressed = False
+
+    # Handle emergency quit
     if check_key_pressed('q'):
         q_pressed += 1
         if q_pressed >= 40:
-            # If held long enough, switch to the menu screen
             enter_exit = 1
             level = 1
             falling = False
@@ -541,6 +579,7 @@ def game_screen():
             q_pressed = 0
     else:
         q_pressed = 0
+
     timeout_tick()
     
     # Call the code in nrlevels.py to load the level
@@ -595,6 +634,10 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+        elif event.type == pygame.KEYDOWN:
+            debug_print(f"Key down: {pygame.key.name(event.key)}")
+        elif event.type == pygame.KEYUP:
+            debug_print(f"Key up: {pygame.key.name(event.key)}")
         elif event.type == START_ANI_STAGE_1_TIMER:
             debug_print("Stage 1 timer")
             animation_step = 1
@@ -698,7 +741,7 @@ while running:
     fps = clock.get_fps()
     
     # Draw the debug overlay
-    if debug:
+    if DEBUG:
         draw_debug_overlay(fps)
     
     pygame.display.flip()
