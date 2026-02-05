@@ -81,7 +81,13 @@ def level1(x: int, y: int, pen: ScratchPen) -> None:
         pen.set_pen_color(LEVEL_COLOR)
 
 def level2(x: int, y: int, pen: ScratchPen) -> None:
-    pass
+    pen.set_pen_size(5)
+    pen.set_pen_color(LEVEL_COLOR)
+    pen.pen_up()
+    pen.goto(-30 + x, -15 + y)
+    pen.pen_down()
+    pen.goto(30 + x, -15 + y)
+
 
 def level3(x: int, y: int, pen: ScratchPen) -> None:
     pass

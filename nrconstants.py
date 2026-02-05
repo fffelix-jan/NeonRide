@@ -19,6 +19,12 @@ HITBOX_ROUND = (15, 15)
 HITBOX_VERTICAL = (15, 18)
 HITBOX_HORIZONTAL = (23, 15)
 
+# Physics and Direction Constants (magic numbers in the original game)
+DIR_GROUND_CHECK = 112     # Direction for checking ground collisions
+DIR_FALL_CHECK = 292       # Direction for checking fall/vertical collisions (equivalent to -68 mod 360)
+DIR_RIGHT_CHECK = 202     # Direction for checking right-side collisions (equivalent to -158 mod 360)
+DIR_LEFT_CHECK = 22        # Direction for checking left-side collisions
+
 # Game States
 STATE_ANIMATION = 0
 STATE_WAITING_FOR_INPUT = 1

@@ -25,6 +25,10 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Global variables
+JUMP_HEIGHT = 8
+HORIZ_SPEED = 3
+GRAVITY_COEFF = 12
+GRAVITY_MAX_STEP = 10
 move = 0
 time_global = 0
 enter_exit = 1
@@ -34,7 +38,7 @@ start = STATE_ANIMATION
 level = 1
 falling = False
 remember = -4
-jump = 10
+jump = JUMP_HEIGHT
 y = 0
 x = 0
 xvel = 0
@@ -43,6 +47,8 @@ t_pressed = False
 q_pressed = 0
 size = 0
 doods = 0
+current_direction_magic_number = 112
+last_jump_time = 0
 
 # Function to print debug messages
 def debug_print(*args, **kwargs):
@@ -74,6 +80,7 @@ def draw_debug_overlay(fps):
         f"Pygame: {pygame.version.ver}",
         f"FPS: {round(fps)}",
         f"X: {x}, Y: {y}",
+        f"{string_pressed_keys()}"
     ]
 
     y_offset = 5
@@ -100,7 +107,7 @@ GAME_REDRAW_TIMER = pygame.USEREVENT + 12
 
 # Variables to track state and animation progress
 current_state = STATE_ANIMATION
-animation_step = 40
+animation_step = 0
 
 # Create a pen object
 pen = ScratchPen(output_buffer)
@@ -148,10 +155,6 @@ def check_key_pressed(key):
     
     if key_code is None:
         raise ValueError(f"The key '{key}' is not a valid key.")
-    
-    # Debug print to verify key presses
-    if keys[key_code]:
-        debug_print(f"Key pressed: {key}")
 
     # Check if the specified key is pressed
     return keys[key_code]
@@ -328,7 +331,7 @@ def start_animation(state):
             global current_state
             # Prepare all the variables and exit the start animation
             enter_exit = 1
-            grid = 1
+            # grid = 1
             grid_size = 100
             start = STATE_MENU_SCREEN
             level = 1
@@ -408,99 +411,186 @@ def death():
         y = goal_y[level - 1]
 
 # Falling
+# This is the function that handles the character falling
 def fall():
-    return
-    global falling, remember, time_global, y, jump
-
+    print("Falling function called")
+    # USE ROUND HITBOX FOR ENTIRE FUNCTION
+    global falling, remember, time_global, y, jump, last_jump_time
     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
         falling = False
+        time_global = 0
         pen.pen_up()
         remember = 0
-        # Move player upwards until no longer colliding
-        while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) or pen.y > 170:
-            y += 1  # Move up in Scratch's coordinate system (increase y)
-            pen.change_y_by(1)  # Move pen up
-            remember += 1  # Track how many steps we moved up
+        while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) and pen.y <= 170:
+            y -= 1
+            pen.change_y_by(1)
+            remember -= 1
+        pen.change_y_by(remember)
+        y += 4
         pen.pen_down()
+        if check_key_pressed("up") and (time.time() - last_jump_time) >= 0.25:
+            last_jump_time = time.time()
+            jump = JUMP_HEIGHT
+            y -= JUMP_HEIGHT
     else:
         if not falling:
             time_global = 0
-            if check_key_pressed('up'):
-                jump = 10
+            if check_key_pressed("up"):
+                jump = JUMP_HEIGHT
             else:
                 jump = 0
         falling = True
-        # Apply gravity
-        y += (15 * (time_global ** 2)) - jump
+        accel = (GRAVITY_COEFF * (time_global * time_global)) - jump
+        if accel > GRAVITY_MAX_STEP:
+            accel = GRAVITY_MAX_STEP
+        y += accel
+
+
+# def fall():
+#     return
+#     global falling, remember, time_global, y, jump
+
+#     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+#         falling = False
+#         pen.pen_up()
+#         remember = 0
+#         # Move player upwards until no longer colliding
+#         while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) or pen.y > 170:
+#             y += 1  # Move up in Scratch's coordinate system (increase y)
+#             pen.change_y_by(1)  # Move pen up
+#             remember += 1  # Track how many steps we moved up
+#         pen.pen_down()
+#     else:
+#         if not falling:
+#             time_global = 0
+#             if check_key_pressed('up'):
+#                 jump = 10
+#             else:
+#                 jump = 0
+#         falling = True
+#         # Apply gravity
+#         y += (15 * (time_global ** 2)) - jump
 
 # Sensing
 def sensing():
+    # USE ROUND HITBOX HERE
     global y, jump, enter_exit, level, x, time_global, xvel
-
-    # Debug prints
-    debug_print(f"Before sensing: xvel={xvel}, y={y}")
-
+    
     # Collision with lava
     if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
         death()
 
+    print(f"Current pen direction: {pen.direction}")
     # Collision with level (ground)
-    if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-        jump = 0
-        y += 5  # Sink slightly into the ground to prevent floating
+    if pen.direction == DIR_GROUND_CHECK:
+        if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+            jump = 0
+            y += 5
+    else:
+        if pen.direction == DIR_FALL_CHECK:
+            # USE ROUND HITBOX HERE
+            fall()
 
-    # Falling logic
-    if not pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-        fall()
-
-    # Collision with goal
-    if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
-        if abs(x) > 200:
-            enter_exit = 1
-            level += 1
-            x = 0
-            y = 0
+            # Collision with goal
+            if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
+                if abs(x) > 200:
+                    enter_exit = 1
+                    level += 1
+                    x = 0
+                    y = 0
+                else:
+                    enter_exit = 2
+                    level -= 1
+                    x = goal_x[level - 1]
+                    y = goal_y[level - 1]
         else:
-            enter_exit = 2
-            level -= 1
-            x = goal_x[level - 1]
-            y = goal_y[level - 1]
+            if pen.direction == DIR_RIGHT_CHECK:
+                # USE HORIZONTAL HITBOX HERE
+                print(f"Result of checking right key and touching color: {check_key_pressed('right')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
+                if check_key_pressed("right") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel < 0):
+                    xvel -= HORIZ_SPEED
+                if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+                    if xvel < 0:
+                        xvel = 0
+                    if check_key_pressed("up") and check_key_pressed("left"):
+                        time_global = 0.1
+                        xvel = HORIZ_SPEED
+            else:
+                if pen.direction == DIR_LEFT_CHECK:
+                    print(f"Result of checking left key and touching color: {check_key_pressed('left')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
+                    # USE HORIZONTAL HITBOX HERE
+                    if check_key_pressed("left") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel > 0):
+                        xvel += HORIZ_SPEED
+                    if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+                        if xvel > 0:
+                            xvel = 0
+                        if check_key_pressed("up") and check_key_pressed("right"):
+                            time_global = 0.1
+                            xvel = -HORIZ_SPEED
 
-    # Handle right movement
-    if check_key_pressed('right'):
-        xvel -= 0.5  # Move right
-        if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-            xvel = 0  # Stop if colliding with a wall
+# def sensing():
+#     global y, jump, enter_exit, level, x, time_global, xvel
 
-    # Handle left movement
-    if check_key_pressed('left'):
-        xvel += 0.5  # Move left
-        if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-            xvel = 0  # Stop if colliding with a wall
+#     # Debug prints
+#     debug_print(f"Before sensing: xvel={xvel}, y={y}")
 
-    # Handle jumping
-    if check_key_pressed('up') and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-        jump = 10
-        y -= jump  # Apply jump force
+#     # Collision with lava
+#     if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
+#         death()
 
-    # Debug prints
-    debug_print(f"After sensing: xvel={xvel}, y={y}")
+#     # Collision with level (ground)
+#     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+#         jump = 0
+#         y += 5  # Sink slightly into the ground to prevent floating
+
+#     # Falling logic
+#     if not pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+#         fall()
+
+#     # Collision with goal
+#     if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
+#         if abs(x) > 200:
+#             enter_exit = 1
+#             level += 1
+#             x = 0
+#             y = 0
+#         else:
+#             enter_exit = 2
+#             level -= 1
+#             x = goal_x[level - 1]
+#             y = goal_y[level - 1]
+
+#     # Handle right movement
+#     if check_key_pressed('right'):
+#         xvel -= 0.5  # Move right
+#         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+#             xvel = 0  # Stop if colliding with a wall
+
+#     # Handle left movement
+#     if check_key_pressed('left'):
+#         xvel += 0.5  # Move left
+#         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
+#             xvel = 0  # Stop if colliding with a wall
+
+#     # Handle jumping
+#     if check_key_pressed('up') and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+#         jump = 10
+#         y -= jump  # Apply jump force
+
+#     # Debug prints
+#     debug_print(f"After sensing: xvel={xvel}, y={y}")
 
 # Debug flying mode
 def debug_fly():
     global x, y
     # Use W, A, S, D keys to move the character in debug mode
     if check_key_pressed('w'):
-        debug_print("W key pressed")
         y -= 1
     if check_key_pressed('s'):
-        debug_print("S key pressed")
         y += 1
     if check_key_pressed('a'):
-        debug_print("A key pressed")
         x += 1
     if check_key_pressed('d'):
-        debug_print("D key pressed")
         x -= 1
 
 # Function that draws the character in the game
@@ -548,7 +638,7 @@ def game_screen():
     draw_character_with_sensing()
 
     # Debug prints to verify xvel and y
-    debug_print(f"xvel: {xvel}, y: {y}")
+    # debug_print(f"xvel: {xvel}, y: {y}")
 
     # Apply xvel to x
     x += xvel

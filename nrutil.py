@@ -83,3 +83,64 @@ def scratch_color_to_hex(color_value):
     
     return f"#{r:02X}{g:02X}{b:02X}"
 
+def string_pressed_keys():
+    """
+    Converts to string the names of the keys currently pressed.
+    """
+    # Get the state of all keys
+    keys = pygame.key.get_pressed()
+
+    # List to store names of currently pressed keys
+    pressed_keys = []
+
+    # Check specific keys
+    for key_constant, key_name in KEY_MAPPING.items():
+        if keys[key_constant]:  # If the key is pressed
+            pressed_keys.append(key_name)
+
+    # Print the list of currently pressed keys
+    if pressed_keys:
+        return "Keys pressed: " + ", ".join(pressed_keys)
+    else:
+        return "No keys pressed"
+
+# Mapping of key constants to their names
+KEY_MAPPING = {
+    pygame.K_a: "A",
+    pygame.K_b: "B",
+    pygame.K_c: "C",
+    pygame.K_d: "D",
+    pygame.K_e: "E",
+    pygame.K_f: "F",
+    pygame.K_g: "G",
+    pygame.K_h: "H",
+    pygame.K_i: "I",
+    pygame.K_j: "J",
+    pygame.K_k: "K",
+    pygame.K_l: "L",
+    pygame.K_m: "M",
+    pygame.K_n: "N",
+    pygame.K_o: "O",
+    pygame.K_p: "P",
+    pygame.K_q: "Q",
+    pygame.K_r: "R",
+    pygame.K_s: "S",
+    pygame.K_t: "T",
+    pygame.K_u: "U",
+    pygame.K_v: "V",
+    pygame.K_w: "W",
+    pygame.K_x: "X",
+    pygame.K_y: "Y",
+    pygame.K_z: "Z",
+    pygame.K_SPACE: "Space",
+    pygame.K_ESCAPE: "Escape",
+    pygame.K_RETURN: "Enter",
+    pygame.K_LSHIFT: "Left Shift",
+    pygame.K_RSHIFT: "Right Shift",
+    pygame.K_LCTRL: "Left Ctrl",
+    pygame.K_RCTRL: "Right Ctrl",
+    pygame.K_UP: "Up Arrow",
+    pygame.K_DOWN: "Down Arrow",
+    pygame.K_LEFT: "Left Arrow",
+    pygame.K_RIGHT: "Right Arrow",
+}

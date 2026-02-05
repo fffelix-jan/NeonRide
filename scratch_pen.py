@@ -1,6 +1,106 @@
 import pygame
 import math
 from nrutil import *
+from nrconstants import *
+
+# Color-grid bookkeeping (Scratch stage is 480x360 centered at (0,0))
+COLOR_GRID_WIDTH = 480
+COLOR_GRID_HEIGHT = 360
+COLOR_ID_AIR = 0
+COLOR_ID_LEVEL = 1
+COLOR_ID_GOAL = 2
+COLOR_ID_LAVA = 3
+
+
+def _color_to_hex_str(color_val):
+    if isinstance(color_val, pygame.Color):
+        return f"#{color_val.r:02X}{color_val.g:02X}{color_val.b:02X}"
+    if isinstance(color_val, (tuple, list)) and len(color_val) >= 3:
+        r, g, b = color_val[:3]
+        return f"#{int(r):02X}{int(g):02X}{int(b):02X}"
+    if isinstance(color_val, str):
+        if color_val.startswith("#"):
+            return color_val.upper()
+        try:
+            temp = pygame.Color(color_val)
+            return f"#{temp.r:02X}{temp.g:02X}{temp.b:02X}"
+        except ValueError:
+            return None
+    return None
+
+
+LEVEL_HEX = _color_to_hex_str(LEVEL_COLOR)
+GOAL_HEX = _color_to_hex_str(GOAL_COLOR)
+LAVA_HEX = _color_to_hex_str(LAVA_COLOR)
+AIR_HEX = _color_to_hex_str(BACKGROUND_COLOR)
+
+COLOR_TO_ID = {
+    LEVEL_HEX: COLOR_ID_LEVEL,
+    GOAL_HEX: COLOR_ID_GOAL,
+    LAVA_HEX: COLOR_ID_LAVA,
+    AIR_HEX: COLOR_ID_AIR,
+}
+
+
+def _resolve_color_id(color_val):
+    # Try direct mapping; fall back to None when the color is not tracked
+    hex_str = _color_to_hex_str(color_val)
+    if hex_str is None:
+        return COLOR_ID_AIR
+    return COLOR_TO_ID.get(hex_str, COLOR_ID_AIR)
+
+
+def scratch_to_grid(x, y):
+    gx = int((x + COLOR_GRID_WIDTH / 2))
+    gy = int((COLOR_GRID_HEIGHT / 2) - y - 1)
+    if gx < 0 or gy < 0 or gx >= COLOR_GRID_WIDTH or gy >= COLOR_GRID_HEIGHT:
+        return None, None
+    return gx, gy
+
+
+def _blank_color_grid():
+    return [[COLOR_ID_AIR for _ in range(COLOR_GRID_WIDTH)] for _ in range(COLOR_GRID_HEIGHT)]
+
+
+color_grid = _blank_color_grid()
+
+
+def reset_color_grid():
+    global color_grid
+    color_grid = _blank_color_grid()
+
+
+def _write_disc_to_grid(center_x, center_y, radius, color_id):
+    if color_id is None:
+        return
+    gx_center, gy_center = scratch_to_grid(center_x, center_y)
+    if gx_center is None:
+        return
+    radius_int = max(1, int(math.ceil(radius)))
+    for oy in range(-radius_int, radius_int + 1):
+        for ox in range(-radius_int, radius_int + 1):
+            if ox * ox + oy * oy > radius_int * radius_int:
+                continue
+            gx = gx_center + ox
+            gy = gy_center + oy
+            if 0 <= gx < COLOR_GRID_WIDTH and 0 <= gy < COLOR_GRID_HEIGHT:
+                color_grid[gy][gx] = color_id
+
+
+def _write_line_to_grid(start_pos, end_pos, thickness, color_id):
+    if color_id is None:
+        return
+    sx, sy = start_pos
+    ex, ey = end_pos
+    dx = ex - sx
+    dy = ey - sy
+    steps = int(max(abs(dx), abs(dy), 1) * 2)
+    radius = max(0.5, thickness / 2)
+    for i in range(steps + 1):
+        t = i / steps
+        px = sx + dx * t
+        py = sy + dy * t
+        _write_disc_to_grid(px, py, radius, color_id)
 
 ## ScratchPen class (used globally)
 # This is a reimplmentation of the Scratch pen in Pygame
@@ -32,7 +132,16 @@ class ScratchPen:
     # Move pen to new position
     def goto(self, x, y):
         if self.pen_down_status:
-            draw_rounded_line(self.surface, self.pen_color, scratch_to_pygame_coordinates(self.x, self.y), scratch_to_pygame_coordinates(x, y), self.pen_size)
+            start = (self.x, self.y)
+            end = (x, y)
+            draw_rounded_line(
+                self.surface,
+                self.pen_color,
+                scratch_to_pygame_coordinates(*start),
+                scratch_to_pygame_coordinates(*end),
+                self.pen_size,
+            )
+            _write_line_to_grid(start, end, self.pen_size, _resolve_color_id(self.pen_color))
         self.x, self.y = x, y  # Update native coordinates
         self.last_pos = (self.x, self.y)  # Update for the next movement
 
@@ -78,6 +187,7 @@ class ScratchPen:
     # Erase all
     def erase_all(self):
         self.surface.fill(BACKGROUND_COLOR)
+        reset_color_grid()
 
     # Adjust color brightness based on shade percentage
     def adjust_color_brightness(self, color, percent):
@@ -96,33 +206,23 @@ class ScratchPen:
 
     # Check if pen is touching a specific color with a specified hitbox
     def touching_color(self, color, hitbox_dimensions):
-        # Check if color is a hex code string starting with '#' and convert to RGB
-        if isinstance(color, str) and color.startswith("#"):
-            color = pygame.Color(color)
+        color_id = _resolve_color_id(color)
+        if color_id is None:
+            return False
 
-        # Extract hitbox width and height
         hitbox_width, hitbox_height = hitbox_dimensions
+        left = int(self.x - hitbox_width // 2)
+        right = int(self.x + math.ceil(hitbox_width / 2))
+        top = int(self.y - hitbox_height // 2)
+        bottom = int(self.y + math.ceil(hitbox_height / 2))
 
-        # Define the hitbox rectangle centered on the pen's position
-        pen_rect = pygame.Rect(
-            self.x - hitbox_width // 2,
-            self.y - hitbox_height // 2,
-            hitbox_width,
-            hitbox_height
-        )
-
-        # Get pixel array for current surface
-        pixels = pygame.PixelArray(self.surface)
-
-        # Loop through the hitbox area to check for the color
-        for x in range(pen_rect.left, pen_rect.right):
-            for y in range(pen_rect.top, pen_rect.bottom):
-                if x < 0 or y < 0 or x >= self.surface.get_width() or y >= self.surface.get_height():
-                    continue  # Skip out-of-bounds pixels
-                if pixels[x, y] == self.surface.map_rgb(color):
-                    pixels.close()
+        for sx in range(left, right):
+            for sy in range(top, bottom):
+                gx, gy = scratch_to_grid(sx, sy)
+                if gx is None:
+                    continue
+                if color_grid[gy][gx] == color_id:
                     return True
-        pixels.close()
         return False
     
     # Move the pen n steps forward in the current direction
@@ -433,9 +533,9 @@ def load_message_at(pen, message, x, y, font_size, color):
     size = font_size
     # This does not work properly, which is why the constants are used
     if color == "0.1":
-        pen.set_pen_color('#202020')
+        pen.set_pen_color(ZERO_POINT_ONE_COLOR)
     elif color == "0.5":
-        pen.set_pen_color('#9C9EA2')
+        pen.set_pen_color(ZERO_POINT_FIVE_COLOR)
     # If the color value is a hex code, set the pen color directly
     elif isinstance(color, str) and color.startswith("#"):
         pen.set_pen_color(color)
