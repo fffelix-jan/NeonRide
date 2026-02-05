@@ -1,6 +1,8 @@
 # NeonRide
 NeonRide is a Python/Pygame port of the Scratch game "Neon Ride" by Greenyman. The goal of this project is a faithful recreation, including the original pen-based drawing, physics feel, and collision behavior.
 
+The original game can be found here: https://scratch.mit.edu/projects/30133706/
+
 ## Overview
 - Direct Scratch-to-Python port with custom pen rendering and collision detection.
 - Tunable movement and gravity constants.
