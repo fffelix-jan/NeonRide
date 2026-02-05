@@ -31,6 +31,12 @@ def draw_rounded_line(surface, color, start_pos, end_pos, thickness):
     thickness = round(thickness * SCALE_FACTOR)
     p1v = pygame.math.Vector2(start_pos)
     p2v = pygame.math.Vector2(end_pos)
+
+    # Avoid zero-length normalize crashes
+    if p1v == p2v:
+        pygame.draw.circle(surface, color, start_pos, max(1, round(thickness / 2)))
+        return
+
     lv = (p2v - p1v).normalize()
     lnv = pygame.math.Vector2(-lv.y, lv.x) * thickness // 2
     pts = [p1v + lnv, p2v + lnv, p2v - lnv, p1v - lnv]

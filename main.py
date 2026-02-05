@@ -26,16 +26,17 @@ else:
 
 # Global variables
 JUMP_HEIGHT = 8
-HORIZ_SPEED = 3
-GRAVITY_COEFF = 12
-GRAVITY_MAX_STEP = 10
+HORIZ_SPEED = 2
+GRAVITY_COEFF = 8
+GRAVITY_MAX_STEP = 6
+SKIP_START_ANIMATION = True
 move = 0
 time_global = 0
 enter_exit = 1
 grid = False
 grid_size = 100
 start = STATE_ANIMATION
-level = 1
+level = 2
 falling = False
 remember = -4
 jump = JUMP_HEIGHT
@@ -112,6 +113,11 @@ animation_step = 0
 # Create a pen object
 pen = ScratchPen(output_buffer)
 ## End of Pen class
+
+# Optional fast-start for debugging
+if SKIP_START_ANIMATION:
+    current_state = STATE_GAME_SCREEN
+    setup_complete = False
 
 
 ## Input functions
@@ -634,7 +640,7 @@ def game_screen():
     pen.erase_all()
     if grid:
         draw_grid()
-    load_level(level, x, y, pen)
+    load_level(level, x, y, pen, move)
     draw_character_with_sensing()
 
     # Debug prints to verify xvel and y
