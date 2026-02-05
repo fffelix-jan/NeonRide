@@ -6,41 +6,32 @@
 APP_NAME="Neon Ride"
 SCRIPT_NAME="main.py"
 ICON_PATH="./assets/icons/app_icon.icns"
-SOUNDS_DIR="./assets/sounds/"
+ASSETS_DIR="./assets"
 BUILD_DIR="./dist"
-SPEC_FILE="${APP_NAME}.spec"
 
 # Clean previous builds
 echo "Cleaning previous builds..."
 rm -rf "${BUILD_DIR}"
 rm -rf "./build"
-rm -f "./${SPEC_FILE}"
-
-
-# Create PyInstaller spec file using python3 -m
-echo "Generating spec file..."
-python3 -m PyInstaller --name "${APP_NAME}" \
-             --windowed \
-             --icon "${ICON_PATH}" \
-             --add-data "${SOUNDS_DIR}/*:assets/sounds" \
-             --osx-bundle-identifier "ca.felixan.neonride" \
-             --specpath . \
-             --onefile \
-             --noconsole \
-             "${SCRIPT_NAME}"
-
-# Modify spec file to include ICNS properly
-sed -i '' -e $'s/iconfile=None/iconfile="\'${ICON_PATH}\'"/' "${SPEC_FILE}"
+rm -f "./${APP_NAME}.spec"
 
 # Build the application using python3 -m
 echo "Building macOS application..."
 python3 -m PyInstaller --noconfirm \
             --clean \
             --windowed \
+            --name "${APP_NAME}" \
             --icon "${ICON_PATH}" \
-            --add-data "${SOUNDS_DIR}/*:assets/sounds" \
-            --osx-bundle-identifier "com.greenyman.neonride" \
-            "${SPEC_FILE}"
+            --collect-all pygame \
+            --noupx \
+            --exclude-module pygame.sndarray \
+            --exclude-module pygame.surfarray \
+            --exclude-module numpy \
+            --exclude-module numba \
+            --exclude-module llvmlite \
+            --add-data "${ASSETS_DIR}:assets" \
+            --osx-bundle-identifier "ca.felixan.neonride" \
+            "${SCRIPT_NAME}"
 
 # Verify build
 if [ -d "${BUILD_DIR}/${APP_NAME}.app" ]; then

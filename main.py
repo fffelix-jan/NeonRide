@@ -25,11 +25,6 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Global variables
-JUMP_HEIGHT = 8           # Upward impulse applied when jumping
-HORIZ_SPEED = 2           # Horizontal acceleration applied per sensing tick
-GRAVITY_COEFF = 8         # Quadratic gravity coefficient (position uses t^2 style)
-GRAVITY_MAX_STEP = 7      # Per-tick clamp on downward acceleration
-SKIP_START_ANIMATION = False
 move = 0
 time_global = 0
 enter_exit = 1
@@ -58,6 +53,14 @@ def debug_print(*args, **kwargs):
 # Initialize Pygame
 pygame.display.set_caption("Neon Ride")
 pygame.init()
+
+# Set the window/dock icon if available
+icon_path = os.path.join(base_path, "assets", "icons", "app_icon.png")
+if os.path.exists(icon_path):
+    try:
+        pygame.display.set_icon(pygame.image.load(icon_path))
+    except pygame.error as exc:
+        debug_print(f"Failed to load icon: {exc}")
 
 # Initialize the mixer
 pygame.mixer.init()
@@ -540,7 +543,7 @@ def draw_character_with_sensing():
     # Physics and collision sampling occurs once per octagon segment
     for i in range(8):
         sensing()
-        if DEBUG:
+        if FLYING_ENABLED:
             debug_fly()
         pen.move(8)
         pen.turn_right(45)
@@ -732,12 +735,12 @@ while running:
                 debug_print(f"Mouse clicked at ({scratch_x}, {scratch_y})")
                 
                 # Check Play button (approximate coordinates)
-                if -200 < scratch_x < 80 and -30 < scratch_y < 150:
+                if scratch_x < 80 and scratch_y > -30:
                     current_state = STATE_GAME_SCREEN
                     setup_complete = False
                     debug_print("Switching to game screen")
                 # Check Instructions button
-                elif -220 < scratch_x < 140 and -70 < scratch_y < -60:
+                elif scratch_x < 140 and scratch_y < -60:
                     current_state = STATE_INSTRUCTION_SCREEN
                     setup_complete = False
                     debug_print("Switching to instruction screen")
@@ -754,8 +757,16 @@ while running:
     elif current_state == STATE_GAME_SCREEN:
         game_screen()
     elif current_state == STATE_INSTRUCTION_SCREEN:
+        # Show message box saying it's not implemented yet
+        show_system_message_box("Not Implemented Yet", "Instructions screen is not implemented yet.")
+        current_state = STATE_MENU_SCREEN
+        setup_complete = False
         pass # TODO: Add instruction screen code here
     elif current_state == STATE_EMERGENCY:
+        # Show message box saying it's not implemented yet
+        show_system_message_box("Not Implemented Yet", "Emergency screen is not implemented yet.")
+        current_state = STATE_MENU_SCREEN
+        setup_complete = False
         pass # TODO: Add emergency screen code here
     elif current_state == STATE_MENU_SCREEN:
         menu_screen()

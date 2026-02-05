@@ -1,5 +1,48 @@
 import pygame
+import os
+import sys
+import subprocess
 from nrconstants import *
+
+
+def show_system_message_box(title, message):
+    """Show a cross-platform system message box using native system calls."""
+    def _escape_applescript_string(value):
+        text = str(value)
+        text = text.replace("\\", "\\\\")
+        text = text.replace("\"", "\\\"")
+        text = text.replace("\r", "\\n").replace("\n", "\\n")
+        return text
+
+    try:
+        if sys.platform == "darwin":
+            safe_message = _escape_applescript_string(message)
+            safe_title = _escape_applescript_string(title)
+            script = f'display dialog "{safe_message}" with title "{safe_title}" buttons {{"OK"}}'
+            subprocess.run(["/usr/bin/osascript", "-e", script], check=False)
+            return True
+        if os.name == "nt":
+            import ctypes
+
+            ctypes.windll.user32.MessageBoxW(0, str(message), str(title), 0)
+            return True
+
+        # Linux/Unix: try common dialog tools if available.
+        for cmd in ("zenity", "kdialog", "xmessage"):
+            if subprocess.run(["/usr/bin/which", cmd], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0:
+                if cmd == "zenity":
+                    subprocess.run([cmd, "--info", "--title", str(title), "--text", str(message)], check=False)
+                elif cmd == "kdialog":
+                    subprocess.run([cmd, "--title", str(title), "--msgbox", str(message)], check=False)
+                else:
+                    subprocess.run([cmd, "-center", str(message)], check=False)
+                return True
+    except Exception:
+        pass
+
+    # Last-resort fallback for headless or restricted environments.
+    print(f"{title}: {message}")
+    return False
 
 # Function to convert Scratch coordinates (center is 0,0) to Pygame coordinates (top-left is 0,0)
 def scratch_to_pygame_coordinates(x, y):
