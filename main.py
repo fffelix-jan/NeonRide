@@ -25,18 +25,18 @@ else:
     base_path = os.path.dirname(os.path.abspath(__file__))
 
 # Global variables
-JUMP_HEIGHT = 8
-HORIZ_SPEED = 2
-GRAVITY_COEFF = 8
-GRAVITY_MAX_STEP = 6
-SKIP_START_ANIMATION = True
+JUMP_HEIGHT = 8           # Upward impulse applied when jumping
+HORIZ_SPEED = 2           # Horizontal acceleration applied per sensing tick
+GRAVITY_COEFF = 8         # Quadratic gravity coefficient (position uses t^2 style)
+GRAVITY_MAX_STEP = 7      # Per-tick clamp on downward acceleration
+SKIP_START_ANIMATION = False
 move = 0
 time_global = 0
 enter_exit = 1
 grid = False
 grid_size = 100
 start = STATE_ANIMATION
-level = 2
+level = 1                 # Starting level
 falling = False
 remember = -4
 jump = JUMP_HEIGHT
@@ -47,7 +47,6 @@ y_pressed = False
 t_pressed = False
 q_pressed = 0
 size = 0
-doods = 0
 current_direction_magic_number = 112
 last_jump_time = 0
 
@@ -423,29 +422,34 @@ def fall():
     # USE ROUND HITBOX FOR ENTIRE FUNCTION
     global falling, remember, time_global, y, jump, last_jump_time
     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
+        # Landing: zero gravity timer, back out of overlap, allow jump if cooldown passed
         falling = False
         time_global = 0
         pen.pen_up()
+        # "remember" is a ground correction offset
         remember = 0
         while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) and pen.y <= 170:
-            y -= 1
-            pen.change_y_by(1)
+            y -= 1              # Move the logical position up one unit at a time
+            pen.change_y_by(1)  # Move the pen in screen space the same amount
             remember -= 1
-        pen.change_y_by(remember)
-        y += 4
+        pen.change_y_by(remember)  # Re-apply offset to keep pen aligned with logical y
+        y += 4                     # Small push up so we are definitely above ground
         pen.pen_down()
+        # Jump only if up is pressed and the 0.25s cooldown expired
         if check_key_pressed("up") and (time.time() - last_jump_time) >= 0.25:
             last_jump_time = time.time()
             jump = JUMP_HEIGHT
             y -= JUMP_HEIGHT
     else:
         if not falling:
+            # First frame of air time: reset timer and capture any buffered jump
             time_global = 0
             if check_key_pressed("up"):
                 jump = JUMP_HEIGHT
             else:
                 jump = 0
         falling = True
+        # Quadratic gravity minus any stored jump impulse, then clamp
         accel = (GRAVITY_COEFF * (time_global * time_global)) - jump
         if accel > GRAVITY_MAX_STEP:
             accel = GRAVITY_MAX_STEP
@@ -463,12 +467,13 @@ def sensing():
     print(f"Current pen direction: {pen.direction}")
     # Collision with level (ground)
     if pen.direction == DIR_GROUND_CHECK:
+        # Ground check: if embedded in ground, nudge upward and clear jump buffer
         if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
             jump = 0
             y += 5
     else:
         if pen.direction == DIR_FALL_CHECK:
-            # USE ROUND HITBOX HERE
+            # Vertical movement: apply gravity/jump resolution
             fall()
 
             # Collision with goal
@@ -485,25 +490,27 @@ def sensing():
                     y = goal_y[level - 1]
         else:
             if pen.direction == DIR_RIGHT_CHECK:
-                # USE HORIZONTAL HITBOX HERE
+                # Rightward motion: accelerate left in Scratch coords (negative x), stop on wall
                 print(f"Result of checking right key and touching color: {check_key_pressed('right')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
                 if check_key_pressed("right") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel < 0):
                     xvel -= HORIZ_SPEED
                 if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
                     if xvel < 0:
                         xvel = 0
+                    # Wall jump-ish assist: tiny kick if holding up+left while against right wall
                     if check_key_pressed("up") and check_key_pressed("left"):
                         time_global = 0.1
                         xvel = HORIZ_SPEED
             else:
                 if pen.direction == DIR_LEFT_CHECK:
                     print(f"Result of checking left key and touching color: {check_key_pressed('left')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
-                    # USE HORIZONTAL HITBOX HERE
+                    # Leftward motion: accelerate right in Scratch coords (positive x), stop on wall
                     if check_key_pressed("left") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel > 0):
                         xvel += HORIZ_SPEED
                     if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
                         if xvel > 0:
                             xvel = 0
+                        # Wall jump-ish assist: tiny kick if holding up+right while against left wall
                         if check_key_pressed("up") and check_key_pressed("right"):
                             time_global = 0.1
                             xvel = -HORIZ_SPEED
@@ -524,14 +531,13 @@ def debug_fly():
 # Function that draws the character in the game
 # Originally just titled "C"
 def draw_character_with_sensing():
-    global doods
     pen.point_in_direction(112)
-    doods = 0
     pen.set_pen_size(3)
     pen.set_pen_color(CHARACTER_COLOR)
     pen.pen_up()
     pen.goto(0, 15)
     pen.pen_down()
+    # Physics and collision sampling occurs once per octagon segment
     for i in range(8):
         sensing()
         if DEBUG:
@@ -558,7 +564,7 @@ def timeout_tick():
 
 # Game screen
 def game_screen():
-    global x, y, xvel, level, grid, t_pressed, q_pressed, enter_exit, falling, start, grid_size
+    global x, y, xvel, level, grid, t_pressed, q_pressed, enter_exit, falling, start, grid_size, current_state, setup_complete
     pen.erase_all()
     if grid:
         draw_grid()
@@ -586,7 +592,8 @@ def game_screen():
     # Handle emergency quit
     if check_key_pressed('q'):
         q_pressed += 1
-        if q_pressed >= 40:
+        if q_pressed >= 80:
+            pen.pen_up()
             enter_exit = 1
             level = 1
             falling = False
@@ -594,7 +601,11 @@ def game_screen():
             x = 0
             xvel = 0
             start = STATE_MENU_SCREEN
+            current_state = STATE_MENU_SCREEN
+            setup_complete = False
             q_pressed = 0
+            # Exit to the main menu
+        load_message_at(pen, "exiting...", 140, -150, 60, 0)
     else:
         q_pressed = 0
 
