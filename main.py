@@ -451,32 +451,6 @@ def fall():
             accel = GRAVITY_MAX_STEP
         y += accel
 
-
-# def fall():
-#     return
-#     global falling, remember, time_global, y, jump
-
-#     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-#         falling = False
-#         pen.pen_up()
-#         remember = 0
-#         # Move player upwards until no longer colliding
-#         while pen.touching_color(LEVEL_COLOR, HITBOX_ROUND) or pen.y > 170:
-#             y += 1  # Move up in Scratch's coordinate system (increase y)
-#             pen.change_y_by(1)  # Move pen up
-#             remember += 1  # Track how many steps we moved up
-#         pen.pen_down()
-#     else:
-#         if not falling:
-#             time_global = 0
-#             if check_key_pressed('up'):
-#                 jump = 10
-#             else:
-#                 jump = 0
-#         falling = True
-#         # Apply gravity
-#         y += (15 * (time_global ** 2)) - jump
-
 # Sensing
 def sensing():
     # USE ROUND HITBOX HERE
@@ -533,58 +507,6 @@ def sensing():
                         if check_key_pressed("up") and check_key_pressed("right"):
                             time_global = 0.1
                             xvel = -HORIZ_SPEED
-
-# def sensing():
-#     global y, jump, enter_exit, level, x, time_global, xvel
-
-#     # Debug prints
-#     debug_print(f"Before sensing: xvel={xvel}, y={y}")
-
-#     # Collision with lava
-#     if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
-#         death()
-
-#     # Collision with level (ground)
-#     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-#         jump = 0
-#         y += 5  # Sink slightly into the ground to prevent floating
-
-#     # Falling logic
-#     if not pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-#         fall()
-
-#     # Collision with goal
-#     if pen.touching_color(GOAL_COLOR, HITBOX_ROUND):
-#         if abs(x) > 200:
-#             enter_exit = 1
-#             level += 1
-#             x = 0
-#             y = 0
-#         else:
-#             enter_exit = 2
-#             level -= 1
-#             x = goal_x[level - 1]
-#             y = goal_y[level - 1]
-
-#     # Handle right movement
-#     if check_key_pressed('right'):
-#         xvel -= 0.5  # Move right
-#         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-#             xvel = 0  # Stop if colliding with a wall
-
-#     # Handle left movement
-#     if check_key_pressed('left'):
-#         xvel += 0.5  # Move left
-#         if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
-#             xvel = 0  # Stop if colliding with a wall
-
-#     # Handle jumping
-#     if check_key_pressed('up') and pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
-#         jump = 10
-#         y -= jump  # Apply jump force
-
-#     # Debug prints
-#     debug_print(f"After sensing: xvel={xvel}, y={y}")
 
 # Debug flying mode
 def debug_fly():
