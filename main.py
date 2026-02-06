@@ -93,19 +93,8 @@ def draw_debug_overlay(fps):
         y_offset += 12
 
 ## Timers
-# Timers that trigger the different stages of the start animation
-START_ANI_STAGE_1_TIMER = pygame.USEREVENT + 1
-START_ANI_STAGE_2_TIMER = pygame.USEREVENT + 2
-START_ANI_STATE_4_TO_11_TIMER = pygame.USEREVENT + 3
-START_ANI_STAGE_12_TIMER = pygame.USEREVENT + 4
-START_ANI_STAGE_13_TIMER = pygame.USEREVENT + 5
-START_ANI_STAGE_14_TIMER = pygame.USEREVENT + 6
-START_ANI_STAGE_15_TIMER = pygame.USEREVENT + 7
-START_ANI_STAGE_16_TIMER = pygame.USEREVENT + 8
-START_ANI_STAGE_17_TO_27_TIMER = pygame.USEREVENT + 9
-START_ANI_STAGE_28_TIMER = pygame.USEREVENT + 10
-START_ANI_STAGE_29_TO_43_TIMER = pygame.USEREVENT + 11
-GAME_REDRAW_TIMER = pygame.USEREVENT + 12
+START_ANIMATION_TIMER = pygame.USEREVENT + 1
+GAME_REDRAW_TIMER = pygame.USEREVENT + 2
 ## End of Timers
 
 # Variables to track state and animation progress
@@ -236,8 +225,7 @@ def start_animation(state):
         if state == 0:
             pen.erase_all()
             dark_field()
-            debug_print("Setting stage 1 timer")
-            pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 500)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 500)
             setup_complete = True
         elif state == 1:
             pen.set_pen_size(15)
@@ -246,8 +234,7 @@ def start_animation(state):
             pen.set_pen_color("#4A6CD4")
             pen.goto(5000, -20)
             pen.pen_up()
-            debug_print("Setting stage 2 timer")
-            pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 2000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 2000)
             setup_complete = True
         elif state == 2:
             start_animation = 1
@@ -261,8 +248,7 @@ def start_animation(state):
         elif 3 <= state <= 10:
             pen.move(60)
             pen.turn_right(45)
-            debug_print("Setting state 4 to 10 timer")
-            pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 100)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 100)
             setup_complete = True
         elif state == 11:
             pen.pen_up()
@@ -271,30 +257,30 @@ def start_animation(state):
             pen.pen_down()
             pen.change_y_by(-40)
             pen.pen_up()
-            pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 100)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 100)
             setup_complete = True
         elif state == 12:
             pen.change_x_by(40)
             pen.pen_down()
             pen.change_y_by(40)
             pen.pen_up()
-            pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 1000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 1000)
             setup_complete = True
         elif state == 13:
             load_message_at(pen, "greenyman/presents...", -230, -90, 150, 50)
-            pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 1000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 1000)
             setup_complete = True
         elif state == 14:
             load_message_at(pen, "greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
-            pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 1000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 1000)
             setup_complete = True
         elif state == 15:
             load_message_at(pen, "greenyman/presents...", -230, -90, 150, 50)
-            pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 1000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 1000)
             setup_complete = True
         elif state == 16:
             load_message_at(pen, "greenyman/presents...", -230, -90, 150, ZERO_POINT_ONE_COLOR)
-            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 1000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 1000)
             setup_complete = True
             pen.set_pen_size(80)
             pen.goto(-240, -100)
@@ -312,16 +298,16 @@ def start_animation(state):
                 load_message_at(pen, "Neon/Ride", -200, -50, 300, ZERO_POINT_ONE_COLOR)
             
             # Set the next timer
-            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 30)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 30)
             setup_complete = True
         elif state == 27:
             # Light up the title
             load_message_at(pen, "Neon/Ride", -200, -50, 300, 0)
-            pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 3000)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 3000)
             setup_complete = True
         elif 28 <= state <= 43:
             # Start the 0.05 s timer first
-            pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 50)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 50)
             setup_complete = True
             # Call the title animation move function
             debug_print(f"Calling move_start_animation with state {state - 27}")
@@ -664,60 +650,9 @@ while running:
             debug_print(f"Key down: {pygame.key.name(event.key)}")
         elif event.type == pygame.KEYUP:
             debug_print(f"Key up: {pygame.key.name(event.key)}")
-        elif event.type == START_ANI_STAGE_1_TIMER:
-            debug_print("Stage 1 timer")
-            animation_step = 1
-            pygame.time.set_timer(START_ANI_STAGE_1_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_2_TIMER:
-            debug_print("Stage 2 timer")
-            animation_step = 2
-            pygame.time.set_timer(START_ANI_STAGE_2_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STATE_4_TO_11_TIMER:
-            debug_print("State 4 to 10 timer")
+        elif event.type == START_ANIMATION_TIMER:
             animation_step += 1
-            pygame.time.set_timer(START_ANI_STATE_4_TO_11_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_12_TIMER:
-            debug_print("Stage 12 timer")
-            animation_step = 12
-            pygame.time.set_timer(START_ANI_STAGE_12_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_13_TIMER:
-            debug_print("Stage 13 timer")
-            animation_step = 13
-            pygame.time.set_timer(START_ANI_STAGE_13_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_14_TIMER:
-            debug_print("Stage 14 timer")
-            animation_step = 14
-            pygame.time.set_timer(START_ANI_STAGE_14_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_15_TIMER:
-            debug_print("Stage 15 timer")
-            animation_step = 15
-            pygame.time.set_timer(START_ANI_STAGE_15_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_16_TIMER:
-            debug_print("Stage 16 timer")
-            animation_step = 16
-            pygame.time.set_timer(START_ANI_STAGE_16_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_17_TO_27_TIMER:
-            debug_print("Stage 17 to 27 timer")
-            animation_step += 1
-            pygame.time.set_timer(START_ANI_STAGE_17_TO_27_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_28_TIMER:
-            debug_print("Stage 28 timer")
-            animation_step = 28
-            pygame.time.set_timer(START_ANI_STAGE_28_TIMER, 0)
-            setup_complete = False
-        elif event.type == START_ANI_STAGE_29_TO_43_TIMER:
-            debug_print("Stage 29 to 43 timer")
-            animation_step += 1
-            pygame.time.set_timer(START_ANI_STAGE_29_TO_43_TIMER, 0)
+            pygame.time.set_timer(START_ANIMATION_TIMER, 0)
             setup_complete = False
     
         # Mouse event handler on the menu screen
