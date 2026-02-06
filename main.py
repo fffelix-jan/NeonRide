@@ -66,7 +66,7 @@ if os.path.exists(icon_path):
 pygame.mixer.init()
 
 # Set initial window size
-screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED)
+screen = pygame.display.set_mode((NATIVE_WIDTH, NATIVE_HEIGHT), pygame.RESIZABLE | pygame.SCALED, vsync=1)
 
 # Create an output buffer
 output_buffer = pygame.Surface((NATIVE_WIDTH, NATIVE_HEIGHT))
@@ -421,7 +421,6 @@ def death():
 # Falling
 # This is the function that handles the character falling
 def fall():
-    print("Falling function called")
     # USE ROUND HITBOX FOR ENTIRE FUNCTION
     global falling, remember, time_global, y, jump, last_jump_time
     if pen.touching_color(LEVEL_COLOR, HITBOX_ROUND):
@@ -467,7 +466,6 @@ def sensing():
     if pen.touching_color(LAVA_COLOR, HITBOX_ROUND):
         death()
 
-    print(f"Current pen direction: {pen.direction}")
     # Collision with level (ground)
     if pen.direction == DIR_GROUND_CHECK:
         # Ground check: if embedded in ground, nudge upward and clear jump buffer
@@ -494,7 +492,6 @@ def sensing():
         else:
             if pen.direction == DIR_RIGHT_CHECK:
                 # Rightward motion: accelerate left in Scratch coords (negative x), stop on wall
-                print(f"Result of checking right key and touching color: {check_key_pressed('right')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
                 if check_key_pressed("right") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel < 0):
                     xvel -= HORIZ_SPEED
                 if pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL):
@@ -506,7 +503,6 @@ def sensing():
                         xvel = HORIZ_SPEED
             else:
                 if pen.direction == DIR_LEFT_CHECK:
-                    print(f"Result of checking left key and touching color: {check_key_pressed('left')}, {not pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL)}")
                     # Leftward motion: accelerate right in Scratch coords (positive x), stop on wall
                     if check_key_pressed("left") and not (pen.touching_color(LEVEL_COLOR, HITBOX_HORIZONTAL) and xvel > 0):
                         xvel += HORIZ_SPEED
@@ -655,8 +651,6 @@ music_path = os.path.join(base_path, "assets", "sounds", "nrmusic.mp3")
 if os.path.exists(music_path):
     pygame.mixer.music.load(music_path)
     pygame.mixer.music.play(-1)
-else:
-    print(f"Error: Music file not found at {music_path}")
 
 while running:
     # Clear the screen

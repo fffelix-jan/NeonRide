@@ -43,6 +43,6 @@ FLYING_ENABLED = False
 JUMP_HEIGHT = 8           # Upward impulse applied when jumping
 HORIZ_SPEED = 2           # Horizontal acceleration applied per sensing tick
 GRAVITY_COEFF = 8         # Quadratic gravity coefficient (position uses t^2 style)
-GRAVITY_MAX_STEP = 7      # Per-tick clamp on downward acceleration
+GRAVITY_MAX_STEP = 8      # Per-tick clamp on downward acceleration
 
 SKIP_START_ANIMATION = False
